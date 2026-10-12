@@ -30,6 +30,18 @@ button,input,select,textarea{font:inherit;color:inherit}
 .card h2{margin:0 0 .5rem;font-size:1rem;letter-spacing:.06em;display:flex;justify-content:space-between;align-items:baseline;gap:.5rem}
 .card h2 small{font-weight:400;color:var(--sub);font-size:.78rem}
 .view[hidden]{display:none}
+.bud{border:1px solid var(--rule);border-left:5px solid var(--fc);border-radius:6px;padding:.45rem .6rem;margin:.35rem 0;background:#fff}
+.bud.live{box-shadow:0 0 0 2px var(--fc)}
+.bud-h{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap}.bud-per{font-size:.76rem;color:var(--sub)}
+.bud-left{margin-left:auto;font-size:.9rem}.bud-left b{font-size:1.15rem;font-variant-numeric:tabular-nums}
+.bud.done .bud-left{color:var(--ex);font-weight:700}
+.bud-bar{height:10px;border-radius:5px;background:#E3E8E0;overflow:hidden;margin:.3rem 0}
+.bud-bar i{display:block;height:100%;background:var(--fc);transition:width .5s linear}
+.bud-act{display:flex;gap:.6rem;align-items:center}
+.fbox{border-bottom:1px dashed var(--rule);padding:.2rem 0 .4rem}
+.fbud{display:flex;align-items:center;gap:.35rem;font-size:.82rem;color:var(--sub);margin-left:2.8rem;flex-wrap:wrap}
+.fbud input{width:5rem;padding:.25rem .4rem;border:1px solid var(--rule);border-radius:5px}.fbud select{padding:.2rem;border:1px solid var(--rule);border-radius:5px}
+
 .btn{border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:6px;padding:.5rem 1.1rem;cursor:pointer}
 .btn.ghost{background:transparent;color:var(--ink)}
 .btn.sm{padding:.25rem .7rem;font-size:.86rem}
@@ -165,6 +177,7 @@ nav.tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 3px 0 
   <section class="view" id="view-camp">
     <header class="head"><h1>ポモドーロ</h1><div class="sub" id="today-sub">—</div></header>
     <div class="rankbar" id="rankbar"></div>
+    <div class="card" id="budgets-card"><h2>持ち時間<small id="bud-sub"></small></h2><div id="budgets"></div></div>
     <div class="timer ph-idle" id="timer"></div>
     <div class="card"><h2>分野<small>始める前に選ぶ</small></h2><div class="fields" id="field-pick"></div></div>
     <div class="card"><h2>体力<small id="hp-sub"></small></h2><div class="hp"><div class="hp-bar"><i id="hp-fill"></i></div><b id="hp-num">—</b></div><div class="debt" id="debt"></div></div>
@@ -359,7 +372,7 @@ const SE = (() => {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "2026-10-12 r2";
+const APP_VERSION = "2026-10-12 r3";
 const DATA = "roadmap/apps/pomodoro/data.json", LOGDIR = "roadmap/apps/pomodoro/log";
 const KEY_CONN = "pomodoro-conn", KEY_LOCAL = "pomodoro-local", KEY_RUN = "pomodoro-run";
 const TANREN = "https://nisenonamae.github.io/tanren/";
@@ -444,6 +457,13 @@ function hpNow(hp, now){ const idle = Math.max(0, (now - (hp.at || now)) / 60000
 // 運動していない作業の分(最後に運動してから)
 function debtOf(es){ let d = 0; for (const e of es.slice().sort((a, b) => a.at - b.at)) { if (e.type === "work") d += +e.min || 0; if (e.type === "ex" && e.done) d = 0; } return d; }
 
+// 持ち時間:分野ごとに決めた時間(1日ごと・1週ごと)のうち、使った分と残り。作業中のものはその場の分も足す
+function budgetPeriod(per, today){ if (per === "week") { const wd = (new Date(today + "T00:00:00Z").getUTCDay() + 6) % 7; return [addDays(today, -wd), today]; } return [today, today]; }
+function budgetOf(f, es, today, live){
+  const b = f.budget; if (!b || !(+b.min > 0)) return null;
+  const [a, z] = budgetPeriod(b.per, today), used = (minutesBy(es, a, z)[f.id] || 0) + (live || 0), total = +b.min;
+  return { total, used, left: Math.max(0, total - used), over: Math.max(0, used - total), per: b.per === "week" ? "week" : "day", frac: Math.max(0, Math.min(1, (total - used) / total)) };
+}
 /* ───────── 状態 ───────── */
 const state = { conn: null, data: clone(DEFAULTS), dataSha: null, logs: {}, logShas: {}, pending: [], field: null, run: null, span: "day", ytReady: false, saving: false };
 function lsGet(k, fb){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
@@ -829,6 +849,7 @@ function renderWar(){
   document.getElementById("rep-day").textContent = today.replace(/-/g, "/");
   document.getElementById("report").innerHTML = '<div class="report"><div class="row" style="gap:1.2rem"><div><div class="note" style="margin:0">作業</div><div class="big">' + fmtMin(mins) + '</div></div><div><div class="note" style="margin:0">やりきった回</div><div class="big">' + tw.filter(e => e.full).length + " / " + d.goal + '</div></div><div><div class="note" style="margin:0">戦果</div><div class="big">+' + gain + "</div></div></div>" +
     "<ul>" + (Object.keys(byF).length ? Object.entries(byF).sort((a, b) => b[1] - a[1]).map(([f, m]) => "<li>" + esc(fieldById(f).name) + " " + fmtMin(m) + "</li>").join("") : "<li>まだ作業はありません</li>") +
+    d.fields.filter(f => f.budget && +f.budget.min > 0).map(f => { const b = budgetOf(f, es, today, 0); return "<li>持ち時間 " + esc(f.name) + ":" + fmtMin(b.used) + " / " + fmtMin(b.total) + (b.per === "week" ? "(今週)" : "") + (b.left > 0 ? "、残り" + fmtMin(b.left) : "、達成") + "</li>"; }).join("") +
     "<li>運動 " + exs.filter(e => e.done).length + "回" + (exs.some(e => !e.done) ? "(飛ばした " + exs.filter(e => !e.done).length + "回)" : "") + "</li>" +
     "<li>" + esc(unitName(rk.unit)) + " " + esc(rk.name) + (rk.stars ? "★" + rk.stars : "") + "。" + esc(rk.next) + "まで あと" + Math.ceil(rk.toNext) + "</li>" +
     "<li>連戦 " + sk.now + "日" + (sk.todayDone ? "(今日も目標をやりきった)" : tw.filter(e => e.full).length ? "(今日はあと" + (d.goal - tw.filter(e => e.full).length) + "回で目標)" : "") + "</li></ul></div>";
@@ -863,12 +884,41 @@ function renderSet(){
   const set = (id, v) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = v; };
   set("s-work", d.work); set("s-ex", d.ex); set("s-rest", d.rest); set("s-long", d.long); set("s-every", d.every); set("s-goal", d.goal); set("s-debt", d.debt); set("s-auto", d.auto ? "1" : "0");
   set("s-exlist", d.exercises.join("\n"));
-  document.getElementById("f-list").innerHTML = d.fields.map(f => '<div class="fitem" data-fid="' + esc(f.id) + '"><input type="color" value="' + esc(f.color) + '" data-fcolor><input type="text" value="' + esc(f.name) + '" data-fname><button type="button" class="linkbtn del" data-fdel>消す</button></div>').join("");
+  document.getElementById("f-list").innerHTML = d.fields.map(f => { const bd = f.budget || {};
+    return '<div class="fbox" data-fid="' + esc(f.id) + '"><div class="fitem"><input type="color" value="' + esc(f.color) + '" data-fcolor><input type="text" value="' + esc(f.name) + '" data-fname><button type="button" class="linkbtn del" data-fdel>消す</button></div>' +
+      '<div class="fbud">持ち時間<input type="number" min="0" max="1440" step="5" value="' + (+bd.min > 0 ? +bd.min : "") + '" placeholder="なし" data-fbudget aria-label="' + esc(f.name) + 'の持ち時間(分)">分<select data-fper><option value="day"' + (bd.per !== "week" ? " selected" : "") + '>1日ごと</option><option value="week"' + (bd.per === "week" ? " selected" : "") + ">1週ごと</option></select></div></div>"; }).join("");
   document.getElementById("b-field").innerHTML = '<option value="">すべての分野</option>' + d.fields.map(f => '<option value="' + esc(f.id) + '">' + esc(f.name) + "</option>").join("");
   document.getElementById("b-list").innerHTML = (d.bgm || []).map(b => '<li data-bid="' + esc(b.id) + '"><span class="bt">' + (b.fav ? "★ " : "") + esc(b.title || b.id) + '</span><select data-brole>' + Object.entries(ROLE_LABEL).map(([k, v]) => '<option value="' + k + '"' + ((b.role || "work") === k ? " selected" : "") + ">" + v + "</option>").join("") + '</select><span class="tag">' + esc(b.field ? fieldById(b.field).name : "すべて") + '</span><button type="button" class="linkbtn del" data-bdel="' + esc(b.id) + '">外す</button></li>').join("") || '<li class="note">まだありません</li>';
   set("s-katsu", d.katsu); set("s-kmode", d.katsuMode); set("s-kmsgs", (d.katsuMsgs || []).join("\n"));
 }
-function renderAll(){ renderRank(); renderFields(); renderTimer(); renderHp(); renderBgmNow(); renderToday(); renderWar(); renderSet(); }
+function liveMin(fid){
+  const r = state.run; if (!r || r.phase !== "work" || r.field !== fid) return 0;
+  return Math.max(0, (r.dur - remaining()) / 60);
+}
+function renderBudgets(){
+  const box = document.getElementById("budgets"); if (!box) return;
+  const es = entries(), today = taskDay(), fs = state.data.fields.filter(f => f.budget && +f.budget.min > 0);
+  document.getElementById("bud-sub").textContent = fs.length ? "取り組むと減っていきます" : "";
+  if (!fs.length) { box.innerHTML = '<p class="note" style="margin:0">設定の「分野」で持ち時間を決めると、ここに残りが出ます(例:内省 1日60分)。その分野でポモドーロをやると、残りが減っていきます。</p>'; return; }
+  box.innerHTML = fs.map(f => { const b = budgetOf(f, es, today, liveMin(f.id)), running = liveMin(f.id) > 0;
+    return '<div class="bud' + (b.left <= 0 ? " done" : "") + (running ? " live" : "") + '" style="--fc:' + esc(f.color) + '" data-bud="' + esc(f.id) + '">' +
+      '<div class="bud-h"><b>' + esc(f.name) + '</b><span class="bud-per">' + (b.per === "week" ? "今週" : "今日") + " 計" + fmtMin(b.total) + "</span>" +
+      '<span class="bud-left" data-bud-left>' + budText(b) + "</span></div>" +
+      '<div class="bud-bar"><i data-bud-bar style="width:' + Math.round(b.frac * 100) + '%"></i></div>' +
+      '<div class="bud-act">' + (running ? '<span class="note" style="margin:0">取り組み中…</span>' : '<button type="button" class="btn ghost sm" data-bstart="' + esc(f.id) + '">これで始める</button>') +
+      '<button type="button" class="linkbtn" data-bmanual="' + esc(f.id) + '">手で記録</button></div></div>'; }).join("");
+}
+function budText(b){ return b.left > 0 ? "残り <b>" + fmtMin(b.left) + "</b>" : "達成 ✓" + (b.over >= 1 ? "(+" + fmtMin(b.over) + ")" : ""); }
+// 作業中は、残りとゲージだけをその場で書き換える(ボタンは作り直さない)
+function tickBudgets(){
+  const r = state.run; if (!r || r.phase !== "work") return;
+  const f = state.data.fields.find(x => x.id === r.field); if (!f || !f.budget || !(+f.budget.min > 0)) return;
+  const el = document.querySelector('[data-bud="' + f.id + '"]'); if (!el) return;
+  const b = budgetOf(f, entries(), taskDay(), liveMin(f.id));
+  el.querySelector("[data-bud-left]").innerHTML = budText(b); el.querySelector("[data-bud-bar]").style.width = Math.round(b.frac * 100) + "%";
+  el.classList.toggle("done", b.left <= 0);
+}
+function renderAll(){ renderBudgets(); renderRank(); renderFields(); renderTimer(); renderHp(); renderBgmNow(); renderToday(); renderWar(); renderSet(); }
 let toastT = null;
 function toast(t){ const el = document.getElementById("toast"); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 3200); }
 function showPromo(rk){
@@ -889,6 +939,12 @@ function bind(){
   document.body.addEventListener("click", e => {
     const q = s => e.target.closest(s); let b;
     if (q("[data-start]")) return startWork();
+    if ((b = q("[data-bstart]"))) { const r = state.run; if (r && r.phase && r.phase !== "idle") { toast("いまの時間が終わってから始めてください"); return; }
+      state.field = b.dataset.bstart; lsSet("pomodoro-field", state.field); renderFields(); return startWork(); }
+    if ((b = q("[data-bmanual]"))) { const f = fieldById(b.dataset.bmanual), v = window.prompt("「" + f.name + "」を、ポモドーロを使わずに何分やりましたか(戦果は付きません)", "15");
+      const n = Math.round(+v); if (!(n > 0 && n <= 600)) return; const now = Date.now();
+      addEntry({ id: uid(), type: "work", date: taskDay(now), at: now - n * 60000, end: now, min: n, field: f.id, full: false, manual: true, gain: 0, mult: 1, hp: Math.round(hpNow(state.data.hp, now)), note: "手で記録" });
+      renderAll(); toast("「" + f.name + "」に" + n + "分を記録しました"); return; }
     if (q("[data-pause]")) return pause();
     if (q("[data-resume]")) return resume();
     if (q("[data-skip]")) return skip();
@@ -912,6 +968,8 @@ function bind(){
     const fi = e.target.closest("[data-fid]");
     if (fi) { const f = state.data.fields.find(x => x.id === fi.dataset.fid); if (!f) return;
       if (e.target.matches("[data-fname]")) f.name = e.target.value.trim() || f.name; if (e.target.matches("[data-fcolor]")) f.color = e.target.value;
+      if (e.target.matches("[data-fbudget]") || e.target.matches("[data-fper]")) { const box = e.target.closest("[data-fid]"), v = Math.round(+box.querySelector("[data-fbudget]").value), per = box.querySelector("[data-fper]").value;
+        if (v > 0) f.budget = { min: Math.min(1440, v), per }; else delete f.budget; renderBudgets(); }
       saveData(); renderFields(); renderWar(); return; }
     const bl = e.target.closest("[data-bid]");
     if (bl && e.target.matches("[data-brole]")) { const it = (state.data.bgm || []).find(x => x.id === bl.dataset.bid); if (it) { it.role = e.target.value; saveData(); renderBgmNow(); } return; }
@@ -987,10 +1045,12 @@ function boot(){
   SE.mount(document.getElementById("se-anchor"));
   if (c && c.token) { state.conn = c; loadAll(); }
   if ((state.data.bgm || []).length && !window.__pomoTest) loadYT();
-  setInterval(() => { tickTimer(); if (document.getElementById("view-camp").hidden === false) renderHp(); }, 500);
+  let wasRunning = false;
+  setInterval(() => { tickTimer(); if (document.getElementById("view-camp").hidden === false) { renderHp(); tickBudgets(); }
+    const nowRunning = !!(state.run && state.run.phase === "work"); if (nowRunning !== wasRunning) { wasRunning = nowRunning; renderBudgets(); } }, 500);
   window.addEventListener("online", flush);
 }
-window.__pomodoro = { abort, addStock, bgmListFor, state, rankOf, danOf, territory, streakOf, hpNow, debtOf, parseYT, multOf, minutesBy, totalGain, entries, startWork, finishWork, exDone, skip, phaseEnd, reorganize, RANKS, unitName };
+window.__pomodoro = { budgetOf, renderBudgets, abort, addStock, bgmListFor, state, rankOf, danOf, territory, streakOf, hpNow, debtOf, parseYT, multOf, minutesBy, totalGain, entries, startWork, finishWork, exDone, skip, phaseEnd, reorganize, RANKS, unitName };
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
 })();
 </script>
