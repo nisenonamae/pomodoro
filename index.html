@@ -57,7 +57,26 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ph-label{font-size:.9rem;letter-spacing:.3em;opacity:.9}
 .clock{font-size:4.2rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.04em;line-height:1.15;margin:.15rem 0}
 .ph-sub{font-size:.84rem;opacity:.9;min-height:1.3em}
-.ring{position:absolute;left:0;bottom:0;height:5px;background:rgba(255,255,255,.55)}
+.ring{position:absolute;left:0;bottom:0;height:5px;background:rgba(255,255,255,.55);transition:width .5s linear}
+.timer.ph-katsu{background:linear-gradient(160deg,#5A1A1A,#9E2A2A)}
+.gauge{position:relative;width:min(15rem,70vw);aspect-ratio:1;margin:.3rem auto 0}
+.gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
+.g-bg{fill:none;stroke:rgba(255,255,255,.18);stroke-width:10}
+.g-fg{fill:none;stroke:#fff;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset .5s linear}
+.g-in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.g-in .clock{font-size:3.4rem;margin:0}
+.ctrl button.abort{border-color:rgba(255,190,190,.9);color:#FFE1E1}
+.katsu-msg{font-size:1.8rem;font-weight:700;letter-spacing:.12em;margin:.5rem 0 .2rem;animation:pop .6s ease}
+.stock{display:grid;grid-template-columns:repeat(auto-fill,minmax(8.6rem,1fr));gap:.5rem;margin:.2rem 0 .5rem}
+.st-card{border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:#fff}
+.st-card.now{border-color:var(--work);box-shadow:0 0 0 2px var(--work)}
+.st-play{display:block;width:100%;border:none;background:none;padding:0;text-align:left;cursor:pointer}
+.st-thumb{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#1F2A24;color:#fff;font-size:.8rem}
+.st-list{display:flex;align-items:center;justify-content:center}
+.st-title{font-size:.78rem;line-height:1.35;padding:.25rem .4rem 0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:2.2em}
+.st-meta{display:flex;justify-content:space-between;align-items:center;padding:.1rem .4rem .3rem}
+.st-fav{border:none;background:none;color:var(--gold);font-size:1.05rem;cursor:pointer;padding:0}
+.st-add{display:flex;gap:.3rem;flex-wrap:wrap}.st-add input{flex:1 1 12rem;min-width:0;padding:.35rem .5rem;border:1px solid var(--rule);border-radius:5px}.st-add select{padding:.3rem;border:1px solid var(--rule);border-radius:5px}
 .ctrl{display:flex;gap:.5rem;justify-content:center;margin-top:.7rem;flex-wrap:wrap}
 .ctrl button{border:1px solid rgba(255,255,255,.75);background:rgba(255,255,255,.12);color:#fff;border-radius:999px;padding:.4rem 1.1rem;cursor:pointer}
 .ctrl button.main{background:#fff;color:var(--ink);border-color:#fff;font-weight:700;padding:.45rem 1.6rem}
@@ -153,7 +172,7 @@ nav.tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 3px 0 
       <div class="bgm-player"><div id="yt"></div></div>
       <div class="row"><button type="button" class="btn ghost sm" id="bgm-toggle">再生</button><button type="button" class="btn ghost sm" id="bgm-next">次の曲</button>
         <label class="note" style="display:flex;align-items:center;gap:.3rem">音量<input id="bgm-vol" type="range" min="0" max="100" value="40"></label></div>
-      <ul class="bgm-list" id="bgm-now"></ul>
+      <div id="bgm-now"></div>
     </div>
     <div class="card"><h2>今日の記録<small id="today-count"></small></h2><ul class="log" id="today-log"></ul></div>
   </section>
@@ -180,6 +199,11 @@ nav.tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 3px 0 
       <div class="f"><label for="s-debt">運動が必要になる作業(分)</label><input id="s-debt" type="number" min="10" max="300"></div>
       <div class="f"><label for="s-auto">次へ自動で進む</label><select id="s-auto"><option value="1">進む</option><option value="0">止まって待つ</option></select></div>
     </div></div>
+    <div class="card"><h2>喝入れ<small>作業の前に気合を入れる時間</small></h2><div class="grid2">
+      <div class="f"><label for="s-katsu">長さ(秒)</label><input id="s-katsu" type="number" min="0" max="600"></div>
+      <div class="f"><label for="s-kmode">いつ入れるか</label><select id="s-kmode"><option value="first">始めるときだけ</option><option value="every">作業の前に毎回</option><option value="off">入れない</option></select></div></div>
+      <div class="f"><label for="s-kmsgs">出す言葉(1行に1つ。毎回この中から1つ)</label><textarea id="s-kmsgs" rows="5"></textarea></div>
+      <p class="note">喝入れのあいだは、ストックで「喝入れ」にした動画が流れます。「すぐ作業へ」で飛ばせます。</p></div>
     <div class="card"><h2>分野</h2><div class="flist" id="f-list"></div><button type="button" class="btn ghost sm" id="f-add">分野を足す</button></div>
     <div class="card"><h2>運動の候補<small>1行に1つ</small></h2><textarea id="s-exlist" rows="6" style="width:100%;padding:.4rem .5rem;border:1px solid var(--rule);border-radius:5px"></textarea>
       <p class="note">運動のときに、この中から1つ出します。鍛錬のアプリもその場で開けます。</p></div>
@@ -187,7 +211,7 @@ nav.tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 3px 0 
       <div class="f"><label for="b-url">URL</label><input id="b-url" type="url" placeholder="https://www.youtube.com/watch?v=… や …&list=…"></div>
       <div class="grid2">
         <div class="f"><label for="b-title">名前(任意)</label><input id="b-title" type="text" placeholder="雨音のカフェ"></div>
-        <div class="f"><label for="b-role">流すとき</label><select id="b-role"><option value="work">作業中</option><option value="rest">休憩中</option></select></div>
+        <div class="f"><label for="b-role">流すとき</label><select id="b-role"><option value="work">作業中</option><option value="rest">休憩中</option><option value="katsu">喝入れ</option><option value="any">いつでも</option></select></div>
         <div class="f"><label for="b-field">分野</label><select id="b-field"></select></div>
       </div>
       <button type="button" class="btn sm" id="b-add">足す</button>
@@ -202,6 +226,7 @@ nav.tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 3px 0 
       <div class="f"><label for="c-token">トークン</label><input id="c-token" type="password" autocomplete="off"></div>
       <div class="row"><button type="button" class="btn" id="connect">接続して読み込む</button><span class="status" id="conn-status"></span></div>
       <p class="note">今開いている版:<b id="app-version"></b></p></div>
+    <div class="card"><h2>効果音<small>行軍表・省・思案と共通</small></h2><p class="note" id="se-anchor">合図の音や、操作したときの音を鳴らします。</p></div>
     <div class="row"><button type="button" class="btn" id="save-set">設定を保存する</button><span class="status" id="set-status"></span></div>
   </section>
 
@@ -213,10 +238,128 @@ nav.tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 3px 0 
   <button role="tab" aria-selected="false" data-view="war">戦況</button>
   <button role="tab" aria-selected="false" data-view="set">設定</button>
 </nav>
+<style>.se-row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0;font-size:.86rem}.se-btn{min-width:2.6rem;border:1px solid #bbb;border-radius:999px;background:#fff;padding:.1rem .7rem;font:inherit;cursor:pointer}.se-btn[aria-pressed="true"]{background:#1f2328;color:#fff;border-color:#1f2328}.se-vol{display:flex;align-items:center;gap:.3rem}.se-vol input{width:8rem}</style>
+<script id="se-core">
+
+// ───────── 効果音(ブラウザの中で音を合成。音のファイルは使わない)─────────
+// 設定(入/切・音量)は 3つのアプリで共通(localStorage の se-on / se-vol)
+const SE = (() => {
+  let ctx = null, master = null, lastTap = 0, lastErr = 0;
+  const ls = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
+  let on = ls("se-on", "1") !== "0", vol = Math.max(0, Math.min(1, +ls("se-vol", "0.5")));
+  function ac(){
+    if (!on) return null;
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+    if (!ctx) { ctx = new AC(); master = ctx.createGain(); master.connect(ctx.destination); }
+    if (ctx.state === "suspended") ctx.resume();
+    master.gain.value = vol * 0.9;
+    return ctx;
+  }
+  // 1つの音:周波数 f(滑らせるなら f2)、始まり t、長さ d、波の形、大きさ g
+  function note(c, f, t, d, o){
+    o = o || {};
+    const osc = c.createOscillator(), gn = c.createGain(), t0 = c.currentTime + (t || 0);
+    osc.type = o.type || "sine"; osc.frequency.setValueAtTime(f, t0);
+    if (o.f2) osc.frequency.exponentialRampToValueAtTime(o.f2, t0 + d);
+    const g = o.g == null ? 0.2 : o.g, a = o.a == null ? 0.005 : o.a;
+    gn.gain.setValueAtTime(0.0001, t0); gn.gain.exponentialRampToValueAtTime(g, t0 + a);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    let last = gn;
+    if (o.lp) { const fl = c.createBiquadFilter(); fl.type = "lowpass"; fl.frequency.value = o.lp; gn.connect(fl); last = fl; }
+    osc.connect(gn); last.connect(master); osc.start(t0); osc.stop(t0 + d + 0.05);
+  }
+  // 鐘のような音(基音 + 倍音)
+  const bell = (c, f, t, d, g) => { note(c, f, t, d, { g: g }); note(c, f * 2, t, d * 0.6, { g: g * 0.35 }); note(c, f * 3.01, t, d * 0.3, { g: g * 0.12 }); };
+  // ざわめき(風・波)
+  function noise(c, t, d, o){
+    o = o || {};
+    const n = Math.floor(c.sampleRate * d), buf = c.createBuffer(1, n, c.sampleRate), ch = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) ch[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource(), fl = c.createBiquadFilter(), gn = c.createGain(), t0 = c.currentTime + (t || 0);
+    src.buffer = buf; fl.type = o.type || "lowpass"; fl.Q.value = o.q || 0.7;
+    fl.frequency.setValueAtTime(o.f || 400, t0); if (o.f2) fl.frequency.exponentialRampToValueAtTime(o.f2, t0 + d * 0.8);
+    const g = o.g || 0.08;
+    gn.gain.setValueAtTime(0.0001, t0); gn.gain.exponentialRampToValueAtTime(g, t0 + d * 0.35); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    src.connect(fl); fl.connect(gn); gn.connect(master); src.start(t0); src.stop(t0 + d + 0.05);
+  }
+  const lib = {
+    tap: c => note(c, 880, 0, 0.05, { f2: 660, g: 0.05 }),
+    tab: c => { note(c, 520, 0, 0.07, { type: "triangle", g: 0.07 }); note(c, 780, 0.03, 0.06, { type: "triangle", g: 0.04 }); },
+    toggleOn: c => note(c, 600, 0, 0.08, { f2: 1150, g: 0.08 }),
+    toggleOff: c => note(c, 900, 0, 0.08, { f2: 480, g: 0.06 }),
+    done: c => { bell(c, 1046.5, 0, 0.45, 0.11); bell(c, 1318.5, 0.08, 0.6, 0.11); },
+    save: c => { bell(c, 784, 0, 0.35, 0.08); bell(c, 1174.7, 0.01, 0.4, 0.06); },
+    remove: c => note(c, 520, 0, 0.14, { f2: 240, type: "triangle", g: 0.08 }),
+    error: c => { note(c, 220, 0, 0.09, { type: "square", g: 0.05, lp: 900 }); note(c, 196, 0.12, 0.12, { type: "square", g: 0.05, lp: 900 }); },
+    open: c => noise(c, 0, 0.18, { f: 300, f2: 2400, type: "bandpass", q: 1.2, g: 0.05 }),
+    fanfare: c => { [523.25, 659.25, 783.99].forEach((f, i) => { note(c, f, i * 0.09, 0.3, { type: "triangle", g: 0.12 }); note(c, f * 2, i * 0.09, 0.2, { g: 0.03 }); });
+      bell(c, 1046.5, 0.27, 1.1, 0.13); note(c, 523.25, 0.27, 1.0, { type: "triangle", g: 0.06 });
+      [2093, 2637, 3136, 2637].forEach((f, i) => note(c, f, 0.45 + i * 0.07, 0.25, { g: 0.025 })); },
+    levelup: c => { note(c, 600, 0, 0.5, { f2: 1600, type: "triangle", g: 0.08 }); [1568, 1975.5, 2349.3, 3136].forEach((f, i) => bell(c, f, 0.35 + i * 0.06, 0.4, 0.04)); },
+    issue: c => { [392, 523.25, 659.25, 783.99].forEach((f, i) => note(c, f, i * 0.12, i === 3 ? 0.9 : 0.22, { type: "sawtooth", g: 0.07, lp: 1800, a: 0.02 }));
+      note(c, 196, 0.36, 0.9, { type: "sawtooth", g: 0.04, lp: 700, a: 0.03 }); },
+    swell: c => { noise(c, 0, 0.9, { f: 200, f2: 1400, g: 0.05 }); [440, 554.4, 659.3].forEach(f => note(c, f, 0.05, 0.9, { g: 0.035, a: 0.35 })); },
+    unswell: c => { noise(c, 0, 0.6, { f: 1200, f2: 250, g: 0.04 }); note(c, 554.4, 0, 0.5, { f2: 440, g: 0.04, a: 0.1 }); },
+    pluck: c => { note(c, 880, 0, 0.35, { type: "triangle", g: 0.09, a: 0.002 }); note(c, 1318.5, 0.05, 0.4, { type: "triangle", g: 0.06, a: 0.002 }); },
+    link: c => { note(c, 659.3, 0, 0.25, { type: "triangle", g: 0.08, a: 0.002 }); note(c, 987.8, 0.09, 0.35, { type: "triangle", g: 0.08, a: 0.002 }); },
+    lock: c => { note(c, 180, 0, 0.06, { type: "square", g: 0.05, lp: 1200 }); note(c, 120, 0.05, 0.08, { type: "square", g: 0.05, lp: 900 }); },
+    unlock: c => { note(c, 160, 0, 0.05, { type: "square", g: 0.05, lp: 1200 }); bell(c, 1318.5, 0.08, 0.45, 0.07); },
+    send: c => noise(c, 0, 0.25, { f: 2400, f2: 400, type: "bandpass", q: 1.5, g: 0.06 }),
+    katsu: c => { [0, 0.32].forEach((t) => { note(c, 95, t, 0.45, { f2: 48, g: 0.35 }); noise(c, t, 0.12, { f: 900, f2: 200, g: 0.12 }); });
+      note(c, 140, 0.62, 0.7, { f2: 60, g: 0.4 }); noise(c, 0.62, 0.2, { f: 1200, f2: 180, g: 0.16 }); },
+    tick: c => note(c, 1320, 0, 0.09, { g: 0.07 }),
+    tickLast: c => { note(c, 1760, 0, 0.18, { g: 0.09 }); note(c, 2640, 0.02, 0.15, { g: 0.04 }); },
+    down: c => { note(c, 660, 0, 0.25, { f2: 440, type: "triangle", g: 0.07 }); },
+  };
+  function play(name, opt){
+    try {
+      const c = ac(); if (!c || !lib[name]) return;
+      if (name === "tap" || name === "tab") { const now = Date.now(); if (now - lastTap < 45) return; lastTap = now; }
+      if (name === "error") { const now = Date.now(); if (now - lastErr < 500) return; lastErr = now; }
+      lib[name](c, opt);
+    } catch (e) {}
+  }
+  // 場面の見分け:アプリごとの [選び方, 音] の並び(上から順に見る)
+  let rules = [];
+  function soundFor(el){
+    for (const [sel, snd] of rules) { const hit = el.closest(sel); if (hit) return typeof snd === "function" ? snd(hit) : snd; }
+    const inp = el.closest("input");
+    if (inp && (inp.type === "checkbox" || inp.type === "radio")) return inp.checked ? "toggleOn" : "toggleOff";
+    if (el.closest("nav button, [role=tab], .tabs button")) return "tab";
+    if (el.closest("button, a[href], summary, .chip-b, [data-v]")) return "tap";
+    return null;
+  }
+  function init(appRules){
+    rules = appRules || [];
+    document.addEventListener("click", e => { const s = e.target && e.target.closest ? soundFor(e.target) : null; if (s) play(s); }, true);
+    // エラーの表示(class="err")が出たら、低い音
+    try {
+      new MutationObserver(ms => { for (const m of ms) { const el = m.target.nodeType === 1 ? m.target : m.target.parentElement; if (!el || !el.closest) continue;
+        const er = el.closest(".err"); if (er && (er.textContent || "").trim()) { play("error"); break; } } })
+        .observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["class"] });
+    } catch (e) {}
+  }
+  // 設定の欄(入/切・音量)。アプリの版の表示のそばに置く
+  function mount(anchor){
+    if (!anchor || document.getElementById("se-row")) return;
+    const row = document.createElement("div"); row.id = "se-row"; row.className = "se-row";
+    row.innerHTML = '<span>効果音</span><button type="button" id="se-on" class="se-btn"></button><label class="se-vol">音量 <input id="se-vol" type="range" min="0" max="1" step="0.05"></label>';
+    anchor.parentNode.insertBefore(row, anchor.nextSibling);
+    const b = row.querySelector("#se-on"), r = row.querySelector("#se-vol");
+    const show = () => { b.textContent = on ? "入" : "切"; b.setAttribute("aria-pressed", String(on)); r.value = vol; r.disabled = !on; };
+    b.addEventListener("click", () => { on = !on; try { localStorage.setItem("se-on", on ? "1" : "0"); } catch (e) {} show(); if (on) play("toggleOn"); });
+    r.addEventListener("input", () => { vol = +r.value; try { localStorage.setItem("se-vol", String(vol)); } catch (e) {} });
+    r.addEventListener("change", () => play("done"));
+    show();
+  }
+  return { play, init, mount, soundFor, get on(){ return on; } };
+})();
+
+</script>
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "2026-10-12 r1";
+const APP_VERSION = "2026-10-12 r2";
 const DATA = "roadmap/apps/pomodoro/data.json", LOGDIR = "roadmap/apps/pomodoro/log";
 const KEY_CONN = "pomodoro-conn", KEY_LOCAL = "pomodoro-local", KEY_RUN = "pomodoro-run";
 const TANREN = "https://nisenonamae.github.io/tanren/";
@@ -239,7 +382,8 @@ const EX_BONUS = 5, GOAL_BONUS = 20;
 const DEFAULTS = { version: 1, work: 25, ex: 5, rest: 5, long: 15, every: 4, goal: 8, debt: 50, auto: true,
   fields: [{ id: "f1", name: "数学", color: "#27415E" }, { id: "f2", name: "英語", color: "#B3283C" }, { id: "f3", name: "国語", color: "#2F7A4A" }, { id: "f4", name: "そのほか", color: "#7A5AA0" }],
   exercises: ["首と肩を回す(1分)", "スクワット10回", "立って背伸びとストレッチ", "目を閉じて遠くを見る", "その場で足踏み2分", "壁腕立て10回", "鍛錬のメニューを1つ"],
-  bgm: [], reorg: [], hp: { v: 100, at: 0 } };
+  bgm: [], pick: {}, reorg: [], hp: { v: 100, at: 0 },
+  katsu: 60, katsuMode: "first", katsuMsgs: ["喝!", "やると決めたら、やる", "最初の5分で勝負が決まる", "昨日の自分を超えろ", "迷う前に手を動かせ", "一問でも前へ"] };
 
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
@@ -410,20 +554,24 @@ function notify(title, body){ try { if ("Notification" in window && Notification
 
 /* ───────── タイマー ─────────
    run = { phase: "work"|"ex"|"rest"|"long", endsAt, left(止めているとき), dur, cycle, field, startedAt, exName, exDone, note } */
-const PH = { work: "作業", ex: "運動", rest: "休憩", long: "長い休憩" };
+const PH = { work: "作業", ex: "運動", rest: "休憩", long: "長い休憩", katsu: "喝入れ" };
 function saveRun(){ lsSet(KEY_RUN, state.run); }
 function startPhase(phase, cycle){
-  const d = state.data, dur = { work: d.work, ex: d.ex, rest: d.rest, long: d.long }[phase] * 60;
+  const d = state.data, dur = phase === "katsu" ? d.katsu : { work: d.work, ex: d.ex, rest: d.rest, long: d.long }[phase] * 60;
   if (!(dur > 0)) return nextPhase(phase, cycle, true);
   const ex = phase === "ex" ? d.exercises[Math.floor(Math.random() * d.exercises.length)] || "体を動かす" : null;
-  state.run = { phase, cycle, dur, endsAt: Date.now() + dur * 1000, left: null, field: state.field, startedAt: Date.now(), exName: ex, exDone: false };
-  saveRun(); beep(phase === "work" ? "work" : phase === "ex" ? "ex" : "rest");
+  const msgs = (d.katsuMsgs || []).filter(Boolean);
+  state.run = { phase, cycle, dur, endsAt: Date.now() + dur * 1000, left: null, field: state.field, startedAt: Date.now(), exName: ex, exDone: false,
+    katsuMsg: phase === "katsu" ? (msgs[Math.floor(Math.random() * msgs.length)] || "喝!") : null };
+  saveRun(); lastTick = null; SE.play({ work: "issue", ex: "swell", rest: "save", long: "levelup", katsu: "katsu" }[phase] || "save");
   bgmFor(phase); renderAll();
 }
 function startWork(){
   if (!state.field) { toast("先に分野を選んでください"); return; }
   if ("Notification" in window && Notification.permission === "default") { try { Notification.requestPermission(); } catch (e) {} }
-  startPhase("work", ((state.run && state.run.cycle) || 0));
+  const cyc = (state.run && state.run.cycle) || 0, d = state.data;
+  if (d.katsuMode !== "off" && d.katsu > 0) return startPhase("katsu", cyc);
+  startPhase("work", cyc);
 }
 function remaining(){ const r = state.run; if (!r) return 0; return r.left != null ? r.left : (r.endsAt - Date.now()) / 1000; }
 function pause(){ const r = state.run; if (!r || r.left != null) return; r.left = remaining(); saveRun(); bgmPause(); renderAll(); }
@@ -461,26 +609,36 @@ function exDone(done){
 function restEnded(min){ const now = Date.now(); state.data.hp = { v: Math.min(100, hpNow(state.data.hp, now) + min * HP.restPerMin), at: now }; saveData(); }
 function nextPhase(phase, cycle, skipped){
   const d = state.data;
+  if (phase === "katsu") return startPhase("work", cycle);
   if (phase === "work") return startPhase(d.ex > 0 ? "ex" : ((cycle + 1) % d.every === 0 ? "long" : "rest"), cycle);
   if (phase === "ex") return startPhase((cycle + 1) % d.every === 0 ? "long" : "rest", cycle);
   // 休憩が終わったら次の作業(自動で進まない設定なら待つ)
   const next = cycle + 1;
-  if (d.auto && state.field) return startPhase("work", next % d.every === 0 && phase === "long" ? 0 : next);
+  const nc = next % d.every === 0 && phase === "long" ? 0 : next;
+  if (d.auto && state.field) return startPhase(d.katsuMode === "every" && d.katsu > 0 ? "katsu" : "work", nc);
   state.run = { phase: "idle", cycle: phase === "long" ? 0 : next }; saveRun(); bgmPause(); renderAll();
 }
 function phaseEnd(){
   const r = state.run; if (!r || r.left != null || !r.phase || r.phase === "idle") return;
-  if (r.phase === "work") { finishWork(true); notify("作業の時間が終わりました", "運動の時間です"); }
+  if (r.phase === "katsu") { /* 喝入れは記録しない */ }
+  else if (r.phase === "work") { finishWork(true); notify("作業の時間が終わりました", "運動の時間です"); }
   else if (r.phase === "ex") { if (!r.exDone) exDone(false); notify("運動の時間が終わりました", "休憩です"); }
   else { restEnded(r.dur / 60); notify("休憩が終わりました", "次の作業へ"); }
   nextPhase(r.phase, r.cycle);
 }
 function skip(){
   const r = state.run; if (!r || !r.phase || r.phase === "idle") return;
+  SE.play("down");
   if (r.phase === "work") finishWork(false);
   else if (r.phase === "ex" && !r.exDone) exDone(false);
   else if (r.phase === "rest" || r.phase === "long") restEnded((r.dur - remaining()) / 60);
   nextPhase(r.phase, r.cycle, true);
+}
+function abort(){
+  const r = state.run; if (!r || !r.phase || r.phase === "idle") return;
+  const was = PH[r.phase];
+  state.run = { phase: "idle", cycle: r.cycle || 0 }; saveRun(); bgmPause(); SE.play("remove"); renderAll();
+  toast(was + "を廃止しました(記録しません)");
 }
 function stopAll(){
   const r = state.run;
@@ -498,10 +656,13 @@ function reorganize(){
 /* ───────── BGM(YouTube) ───────── */
 let yt = null, ytWant = null, bgmIdx = {}, bgmPlaying = false;
 function bgmListFor(role){
-  const all = state.data.bgm || [], f = state.field;
-  const mine = all.filter(b => b.role === role && b.field && b.field === f);
-  return mine.length ? mine : all.filter(b => b.role === role && !b.field);
+  const all = state.data.bgm || [], f = state.field, ok = b => b.role === role || b.role === "any";
+  const mine = all.filter(b => ok(b) && b.field && b.field === f);
+  return (mine.length ? mine : all.filter(b => ok(b) && !b.field)).sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0));
 }
+const pickKey = role => role + "|" + (state.field || "");
+// ストックから選んだ曲を、その場面(作業・休憩・喝入れ)で流す曲として覚える
+function pickItem(b, role){ state.data.pick = state.data.pick || {}; state.data.pick[pickKey(role)] = b.id; saveData(); }
 function loadYT(){
   if (window.YT && window.YT.Player) { onYT(); return; }
   if (document.getElementById("yt-api")) return;
@@ -512,7 +673,8 @@ function onYT(){
   if (yt || !document.getElementById("yt")) return;
   yt = new window.YT.Player("yt", { width: "100%", height: "100%", playerVars: { playsinline: 1, rel: 0 },
     events: { onReady: () => { state.ytReady = true; try { yt.setVolume(+document.getElementById("bgm-vol").value); } catch (e) {} if (ytWant) playItem(ytWant); },
-      onStateChange: ev => { bgmPlaying = ev.data === 1; const b = document.getElementById("bgm-toggle"); if (b) b.textContent = bgmPlaying ? "止める" : "再生";
+      onStateChange: ev => { bgmPlaying = ev.data === 1;
+        if (ev.data === 1 && ytWant && !ytWant.title) { try { const vd = yt.getVideoData(), it = (state.data.bgm || []).find(x => x.id === ytWant.id); if (it && vd && vd.title) { it.title = vd.title; ytWant.title = vd.title; saveData(); renderBgmNow(); renderSet(); } } catch (e) {} } const b = document.getElementById("bgm-toggle"); if (b) b.textContent = bgmPlaying ? "止める" : "再生";
         if (ev.data === 0 && ytWant && ytWant.kind === "video") bgmNext(); } } });
 }
 function playItem(b){
@@ -520,21 +682,23 @@ function playItem(b){
   if (!state.ytReady || !yt) { loadYT(); return; }
   try { if (b.kind === "list") yt.loadPlaylist({ list: b.id, listType: "playlist" }); else yt.loadVideoById(b.id); } catch (e) {}
 }
+function roleOf(phase){ return phase === "work" ? "work" : (phase === "rest" || phase === "long") ? "rest" : phase === "katsu" ? "katsu" : null; }
 function bgmFor(phase){
-  const role = phase === "work" ? "work" : (phase === "rest" || phase === "long") ? "rest" : null;
+  const role = roleOf(phase);
   const list = role ? bgmListFor(role) : [];
   if (!list.length) { bgmPause(); return; }
-  const k = role + "|" + (state.field || ""), i = (bgmIdx[k] || 0) % list.length;
-  const b = list[i];
+  const k = pickKey(role), picked = list.find(x => x.id === (state.data.pick || {})[k]);
+  const b = picked || list[(bgmIdx[k] || 0) % list.length];
   if (ytWant && ytWant.id === b.id && state.ytReady) { try { yt.playVideo(); } catch (e) {} renderBgmNow(); return; }
   playItem(b);
 }
 function bgmPause(){ try { if (yt && state.ytReady) yt.pauseVideo(); } catch (e) {} }
 function bgmNext(){
-  const r = state.run, role = r && (r.phase === "rest" || r.phase === "long") ? "rest" : "work", list = bgmListFor(role);
+  const r = state.run, role = (r && roleOf(r.phase)) || "work", list = bgmListFor(role);
   if (!list.length) return;
   if (ytWant && ytWant.kind === "list" && yt && state.ytReady) { try { yt.nextVideo(); return; } catch (e) {} }
-  const k = role + "|" + (state.field || ""); bgmIdx[k] = ((bgmIdx[k] || 0) + 1) % list.length; playItem(list[bgmIdx[k]]);
+  const k = pickKey(role), cur = list.findIndex(x => ytWant && x.id === ytWant.id); bgmIdx[k] = ((cur >= 0 ? cur : bgmIdx[k] || 0) + 1) % list.length;
+  pickItem(list[bgmIdx[k]], role); playItem(list[bgmIdx[k]]);
 }
 
 /* ───────── 階級章(絵) ───────── */
@@ -579,25 +743,33 @@ function renderTimer(){
   const cyc = r ? r.cycle % d.every : 0;
   let sub = "";
   if (ph === "idle") sub = state.field ? fieldById(state.field).name + "で始めます" : "分野を選んで始めます";
-  else if (ph === "work") sub = fieldById(r.field).name + (paused ? "(止めています)" : "");
+  else if (ph === "work") sub = fieldById(r.field).name + (paused ? "(中断しています)" : "");
   else if (ph === "ex") sub = "体を動かして、体力を戻します";
-  else sub = "目と体を休めます" + (paused ? "(止めています)" : "");
+  else if (ph === "katsu") sub = "このあと " + fieldById(r.field).name + " の作業" + (paused ? "(中断しています)" : "");
+  else if (ph !== "katsu") sub = "目と体を休めます" + (paused ? "(中断しています)" : "");
   let extra = "";
+  if (ph === "katsu") extra = '<div class="katsu-msg">' + esc(r.katsuMsg || "喝!") + "</div>";
   if (ph === "ex") extra = '<div class="exbox"><div class="note" style="margin:0">今回の運動</div><div class="exn">' + esc(r.exName) + "</div>" +
     (r.exDone ? '<div class="note">記録しました</div>' : '<div class="row"><button type="button" class="btn sm" data-ex-done>やった(体力+' + HP.exDone + ')</button><button type="button" class="btn ghost sm" data-ex-skip>飛ばす</button><a class="linkbtn" href="' + TANREN + '" target="_blank" rel="noopener">鍛錬を開く</a></div>') + "</div>";
   if ((ph === "ex" || ph === "rest" || ph === "long") && state.lastWorkId) extra += '<div class="notebox"><div class="note" style="margin:0 0 .2rem">さっきの作業でやったこと(任意)</div><input id="note-in" placeholder="例:青チャート例題30〜35" value="' + esc((works(entries()).find(e => e.id === state.lastWorkId) || {}).note || "") + '"></div>';
-  box.innerHTML = '<div class="ph-label">' + (ph === "idle" ? "待機" : PH[ph]) + '</div><div class="clock" id="clock">' + clock(left) + '</div><div class="ph-sub">' + esc(sub) + "</div>" +
+  const frac = ph === "idle" ? 1 : Math.max(0, Math.min(1, left / r.dur)), C = 2 * Math.PI * 88;
+  box.innerHTML = '<div class="ph-label">' + (ph === "idle" ? "待機" : PH[ph]) + '</div>' +
+    '<div class="gauge"><svg viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="88" class="g-bg"/><circle cx="100" cy="100" r="88" class="g-fg" id="g-fg" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - frac)).toFixed(1) + '"/></svg>' +
+    '<div class="g-in"><div class="clock" id="clock">' + clock(left) + '</div><div class="ph-sub">' + esc(sub) + "</div></div></div>" +
     '<div class="cycles">' + Array.from({ length: d.every }, (_, k) => '<span class="' + (k < cyc || (ph !== "idle" && ph !== "work" && k === cyc) ? "on" : "") + '"></span>').join("") + "</div>" +
     '<div class="ctrl">' + (ph === "idle" ? '<button type="button" class="main" data-start>作業を始める</button>'
-      : (paused ? '<button type="button" class="main" data-resume>続ける</button>' : '<button type="button" class="main" data-pause>止める</button>') +
-        '<button type="button" data-skip>' + (ph === "work" ? "作業を終える" : "次へ") + '</button><button type="button" data-stop>やめる</button>') + "</div>" + extra +
-    '<div class="ring" id="ring" style="width:' + (ph === "idle" ? 0 : Math.round((1 - left / r.dur) * 100)) + '%"></div>';
+      : (paused ? '<button type="button" class="main" data-resume>再開</button>' : '<button type="button" class="main" data-pause>中断</button>') +
+        '<button type="button" data-skip>' + (ph === "work" ? "ここで終える" : ph === "katsu" ? "すぐ作業へ" : "次へ") + '</button><button type="button" class="abort" data-abort title="記録せずに捨てる">廃止</button>') + "</div>" + extra +
+    '<div class="ring" id="ring" style="width:' + Math.round(frac * 100) + '%"></div>';
 }
+let lastTick = null;
 function tickTimer(){
   const r = state.run; if (!r || !r.phase || r.phase === "idle") { document.title = "ポモドーロ"; return; }
   const left = remaining();
-  const c = document.getElementById("clock"), g = document.getElementById("ring");
-  if (c) c.textContent = clock(left); if (g) g.style.width = Math.round((1 - left / r.dur) * 100) + "%";
+  const c = document.getElementById("clock"), g = document.getElementById("ring"), fg = document.getElementById("g-fg"), frac = Math.max(0, Math.min(1, left / r.dur));
+  if (c) c.textContent = clock(left); if (g) g.style.width = Math.round(frac * 100) + "%";
+  if (fg) fg.setAttribute("stroke-dashoffset", (2 * Math.PI * 88 * (1 - frac)).toFixed(1));
+  if (r.left == null) { const sec = Math.ceil(left); if (sec >= 1 && sec <= 3 && lastTick !== sec) { lastTick = sec; SE.play(sec === 1 ? "tickLast" : "tick"); } }
   document.title = clock(left) + " " + PH[r.phase] + "|ポモドーロ";
   if (r.left == null && left <= 0) phaseEnd();
 }
@@ -618,10 +790,18 @@ function renderHp(){
   const debt = debtOf(entries()) + (r && r.phase === "work" ? (r.dur - remaining()) / 60 : 0);
   document.getElementById("debt").innerHTML = "体の負債:" + (debt >= state.data.debt ? "<b>" + fmtMin(debt) + "(運動が必要です)</b>" : fmtMin(debt) + " / " + state.data.debt + "分で運動が必要");
 }
+const ROLE_LABEL = { work: "作業", rest: "休憩", katsu: "喝入れ", any: "いつでも" };
+function thumb(b){ return b.kind === "list" ? '<span class="st-thumb st-list">▶︎ 再生リスト</span>' : '<img class="st-thumb" loading="lazy" alt="" src="https://i.ytimg.com/vi/' + esc(b.id) + '/mqdefault.jpg">'; }
 function renderBgmNow(){
-  const r = state.run, role = r && (r.phase === "rest" || r.phase === "long") ? "rest" : "work", list = bgmListFor(role);
-  document.getElementById("bgm-sub").textContent = list.length ? (role === "work" ? "作業中に流す " : "休憩中に流す ") + list.length + "件" : "設定でURLを足すと流れます";
-  document.getElementById("bgm-now").innerHTML = list.map(b => '<li class="' + (ytWant && ytWant.id === b.id ? "now" : "") + '"><span class="bt">' + esc(b.title || (b.kind === "list" ? "再生リスト" : "動画")) + '</span><span class="tag">' + (b.kind === "list" ? "リスト" : "動画") + '</span><button type="button" class="linkbtn" data-bgm-play="' + esc(b.id) + '">流す</button></li>').join("");
+  const r = state.run, role = (r && roleOf(r.phase)) || "work", all = (state.data.bgm || []).slice().sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0));
+  const tab = state.stockTab || "now", list = tab === "now" ? bgmListFor(role) : all;
+  document.getElementById("bgm-sub").textContent = all.length ? "ストック " + all.length + "件" : "URLを貼って、よく使う動画をストックしておけます";
+  document.getElementById("bgm-now").innerHTML =
+    '<div class="seg" style="margin:.4rem 0"><button type="button" data-stock-tab="now" aria-pressed="' + (tab === "now") + '">今の場面(' + ROLE_LABEL[role] + ')</button><button type="button" data-stock-tab="all" aria-pressed="' + (tab === "all") + '">すべて</button></div>' +
+    (list.length ? '<div class="stock">' + list.map(b => '<div class="st-card' + (ytWant && ytWant.id === b.id ? " now" : "") + '"><button type="button" class="st-play" data-bgm-play="' + esc(b.id) + '" title="今すぐ流す">' + thumb(b) +
+      '<span class="st-title">' + esc(b.title || (b.kind === "list" ? "再生リスト" : "名前は流すと入ります")) + '</span></button><div class="st-meta"><span class="tag">' + ROLE_LABEL[b.role || "work"] + (b.field ? "・" + esc(fieldById(b.field).name) : "") + '</span><button type="button" class="st-fav" data-bgm-fav="' + esc(b.id) + '" aria-pressed="' + !!b.fav + '" title="よく使う">' + (b.fav ? "★" : "☆") + "</button></div></div>").join("") + "</div>"
+      : '<p class="note">' + (tab === "now" ? "この場面で流す動画はまだありません。下に貼って足すか、「すべて」から選んでください。" : "まだありません。") + "</p>") +
+    '<div class="st-add"><input id="q-url" type="url" placeholder="YouTubeのURLを貼ってストックに足す"><select id="q-role">' + Object.entries(ROLE_LABEL).map(([k, v]) => '<option value="' + k + '"' + (k === role ? " selected" : "") + ">" + v + "</option>").join("") + '</select><button type="button" class="btn sm" data-q-add>足す</button></div>';
 }
 function renderToday(){
   const d = taskDay(), es = entries().filter(e => e.date === d).sort((a, b) => b.at - a.at);
@@ -685,13 +865,14 @@ function renderSet(){
   set("s-exlist", d.exercises.join("\n"));
   document.getElementById("f-list").innerHTML = d.fields.map(f => '<div class="fitem" data-fid="' + esc(f.id) + '"><input type="color" value="' + esc(f.color) + '" data-fcolor><input type="text" value="' + esc(f.name) + '" data-fname><button type="button" class="linkbtn del" data-fdel>消す</button></div>').join("");
   document.getElementById("b-field").innerHTML = '<option value="">すべての分野</option>' + d.fields.map(f => '<option value="' + esc(f.id) + '">' + esc(f.name) + "</option>").join("");
-  document.getElementById("b-list").innerHTML = (d.bgm || []).map(b => '<li><span class="bt">' + esc(b.title || b.id) + '</span><span class="tag">' + (b.role === "rest" ? "休憩" : "作業") + '</span><span class="tag">' + esc(b.field ? fieldById(b.field).name : "すべて") + '</span><button type="button" class="linkbtn del" data-bdel="' + esc(b.id) + '">外す</button></li>').join("") || '<li class="note">まだありません</li>';
+  document.getElementById("b-list").innerHTML = (d.bgm || []).map(b => '<li data-bid="' + esc(b.id) + '"><span class="bt">' + (b.fav ? "★ " : "") + esc(b.title || b.id) + '</span><select data-brole>' + Object.entries(ROLE_LABEL).map(([k, v]) => '<option value="' + k + '"' + ((b.role || "work") === k ? " selected" : "") + ">" + v + "</option>").join("") + '</select><span class="tag">' + esc(b.field ? fieldById(b.field).name : "すべて") + '</span><button type="button" class="linkbtn del" data-bdel="' + esc(b.id) + '">外す</button></li>').join("") || '<li class="note">まだありません</li>';
+  set("s-katsu", d.katsu); set("s-kmode", d.katsuMode); set("s-kmsgs", (d.katsuMsgs || []).join("\n"));
 }
 function renderAll(){ renderRank(); renderFields(); renderTimer(); renderHp(); renderBgmNow(); renderToday(); renderWar(); renderSet(); }
 let toastT = null;
 function toast(t){ const el = document.getElementById("toast"); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 3200); }
 function showPromo(rk){
-  beep("promo");
+  SE.play("fanfare");
   const el = document.getElementById("promo");
   el.innerHTML = '<div class="pc">' + insignia(rk).replace('class="insig"', 'class="insig"') + '<div class="note">' + esc(unitName(rk.unit)) + "</div><h3>" + esc(rk.name) + (rk.stars ? " ★" + rk.stars : "") + "に昇進</h3>" +
     '<p class="note">' + (rk.top && !rk.stars ? "最高の階級です。ここから先は星が増えていきます。「再編成」で新しい部隊を作ることもできます。" : "次は " + esc(rk.next) + "。") + '</p><button type="button" class="btn" data-promo-ok>続ける</button></div>';
@@ -711,13 +892,18 @@ function bind(){
     if (q("[data-pause]")) return pause();
     if (q("[data-resume]")) return resume();
     if (q("[data-skip]")) return skip();
-    if (q("[data-stop]")) { if (!state.run || state.run.phase === "idle" || confirm("やめますか。作業の途中なら、そこまでの時間を記録します。")) stopAll(); return; }
+    if (q("[data-abort]")) { const r = state.run; if (r && r.phase === "work" && !confirm("この作業を廃止しますか。記録も戦果も残りません(残したいときは「ここで終える」)。")) return; abort(); return; }
     if (q("[data-ex-done]")) return exDone(true);
     if (q("[data-ex-skip]")) return exDone(false);
     if (q("[data-reorg]")) return reorganize();
     if (q("[data-promo-ok]")) { document.getElementById("promo").hidden = true; return; }
     if ((b = q("[data-field]"))) { state.field = b.dataset.field; lsSet("pomodoro-field", state.field); renderFields(); renderTimer(); renderBgmNow(); return; }
-    if ((b = q("[data-bgm-play]"))) { const it = (state.data.bgm || []).find(x => x.id === b.dataset.bgmPlay); if (it) playItem(it); return; }
+    if ((b = q("[data-bgm-play]"))) { const it = (state.data.bgm || []).find(x => x.id === b.dataset.bgmPlay); if (!it) return;
+      const r = state.run, role = (r && roleOf(r.phase)) || (it.role === "any" ? "work" : it.role || "work"); pickItem(it, role); playItem(it); return; }
+    if ((b = q("[data-bgm-fav]"))) { const it = (state.data.bgm || []).find(x => x.id === b.dataset.bgmFav); if (it) { it.fav = !it.fav; saveData(); renderBgmNow(); renderSet(); } return; }
+    if ((b = q("[data-stock-tab]"))) { state.stockTab = b.dataset.stockTab; renderBgmNow(); return; }
+    if (q("[data-q-add]")) { const url = document.getElementById("q-url").value, p = parseYT(url); if (!p) { toast("YouTubeの動画か再生リストのURLを入れてください"); return; }
+      addStock({ id: p.id, kind: p.kind, title: "", role: document.getElementById("q-role").value, field: "", url: url.trim() }); return; }
     if ((b = q("[data-span]"))) { state.span = b.dataset.span; renderWar(); return; }
     if ((b = q("[data-fdel]"))) { const id = b.closest("[data-fid]").dataset.fid; if (!confirm("この分野を消しますか(記録は残ります)。")) return; state.data.fields = state.data.fields.filter(f => f.id !== id); saveData(); renderAll(); return; }
     if ((b = q("[data-bdel]"))) { state.data.bgm = (state.data.bgm || []).filter(x => x.id !== b.dataset.bdel); saveData(); renderAll(); return; }
@@ -727,6 +913,8 @@ function bind(){
     if (fi) { const f = state.data.fields.find(x => x.id === fi.dataset.fid); if (!f) return;
       if (e.target.matches("[data-fname]")) f.name = e.target.value.trim() || f.name; if (e.target.matches("[data-fcolor]")) f.color = e.target.value;
       saveData(); renderFields(); renderWar(); return; }
+    const bl = e.target.closest("[data-bid]");
+    if (bl && e.target.matches("[data-brole]")) { const it = (state.data.bgm || []).find(x => x.id === bl.dataset.bid); if (it) { it.role = e.target.value; saveData(); renderBgmNow(); } return; }
     if (e.target.id === "note-in" && state.lastWorkId) {
       const ent = works(entries()).find(x => x.id === state.lastWorkId); if (!ent) return;
       ent.note = e.target.value.trim();
@@ -747,15 +935,16 @@ function bind(){
     const url = document.getElementById("b-url").value, p = parseYT(url);
     if (!p) { toast("YouTubeの動画か再生リストのURLを入れてください"); return; }
     const item = { id: p.kind === "list" ? p.id : p.id, kind: p.kind, title: document.getElementById("b-title").value.trim(), role: document.getElementById("b-role").value, field: document.getElementById("b-field").value, url: url.trim() };
-    state.data.bgm = (state.data.bgm || []).filter(x => !(x.id === item.id && x.role === item.role && x.field === item.field)).concat([item]);
     document.getElementById("b-url").value = ""; document.getElementById("b-title").value = "";
-    saveData(); renderAll(); toast("BGMを足しました");
+    addStock(item);
   });
   document.getElementById("save-set").addEventListener("click", async () => {
     const n = (id, lo, hi, fb) => { const v = Math.round(+document.getElementById(id).value); return isFinite(v) && v >= lo && v <= hi ? v : fb; }, d = state.data;
     d.work = n("s-work", 1, 180, d.work); d.ex = n("s-ex", 0, 60, d.ex); d.rest = n("s-rest", 0, 60, d.rest); d.long = n("s-long", 0, 120, d.long);
     d.every = n("s-every", 2, 12, d.every); d.goal = n("s-goal", 1, 30, d.goal); d.debt = n("s-debt", 10, 300, d.debt); d.auto = document.getElementById("s-auto").value === "1";
     const ex = document.getElementById("s-exlist").value.split("\n").map(x => x.trim()).filter(Boolean); if (ex.length) d.exercises = ex;
+    d.katsu = n("s-katsu", 0, 600, d.katsu); d.katsuMode = document.getElementById("s-kmode").value;
+    const km = document.getElementById("s-kmsgs").value.split("\n").map(x => x.trim()).filter(Boolean); if (km.length) d.katsuMsgs = km;
     setStatus("保存しています…"); const ok = await saveData(); setStatus(ok ? "保存しました" : "保存できませんでした", !ok); renderAll();
   });
   document.getElementById("connect").addEventListener("click", async () => {
@@ -764,6 +953,10 @@ function bind(){
     if (!c.owner || !c.token) { const st = document.getElementById("conn-status"); st.classList.add("err"); st.textContent = "ユーザー名とトークンを入れてください。"; return; }
     state.conn = c; lsSet(KEY_CONN, c); await loadAll();
   });
+}
+function addStock(item){
+  state.data.bgm = (state.data.bgm || []).filter(x => !(x.id === item.id && x.role === item.role && x.field === item.field)).concat([item]);
+  saveData(); renderAll(); toast("ストックに足しました" + (item.title ? "" : "(名前は、流すと自動で入ります)"));
 }
 // 作業のメモは、あとから書き足せる(同じ記録を書き換える)
 async function notePatch(ent){
@@ -788,12 +981,16 @@ function boot(){
   document.getElementById("app-version").textContent = APP_VERSION; document.getElementById("ver").textContent = APP_VERSION;
   const vol = lsGet("pomodoro-vol", null); if (vol != null) document.getElementById("bgm-vol").value = vol;
   bind(); renderAll();
+  SE.init([["[data-start], [data-abort], [data-skip], [data-ex-skip]", null], ["[data-ex-done]", "done"], ["[data-reorg]", "fanfare"], ["[data-promo-ok]", "tap"],
+    ["[data-q-add], #b-add, #save-set, #f-add", "save"], ["[data-bdel], [data-fdel]", "remove"], ["[data-bgm-fav]", el => el.getAttribute("aria-pressed") === "true" ? "toggleOff" : "toggleOn"],
+    ["[data-field], [data-bgm-play]", "pluck"], ["nav.tabs button, [data-span], [data-stock-tab]", "tab"]]);
+  SE.mount(document.getElementById("se-anchor"));
   if (c && c.token) { state.conn = c; loadAll(); }
   if ((state.data.bgm || []).length && !window.__pomoTest) loadYT();
   setInterval(() => { tickTimer(); if (document.getElementById("view-camp").hidden === false) renderHp(); }, 500);
   window.addEventListener("online", flush);
 }
-window.__pomodoro = { state, rankOf, danOf, territory, streakOf, hpNow, debtOf, parseYT, multOf, minutesBy, totalGain, entries, startWork, finishWork, exDone, skip, phaseEnd, reorganize, RANKS, unitName };
+window.__pomodoro = { abort, addStock, bgmListFor, state, rankOf, danOf, territory, streakOf, hpNow, debtOf, parseYT, multOf, minutesBy, totalGain, entries, startWork, finishWork, exDone, skip, phaseEnd, reorganize, RANKS, unitName };
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
 })();
 </script>
