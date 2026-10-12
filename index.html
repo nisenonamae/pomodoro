@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ポモドーロ</title>
+<meta name="theme-color" content="#1F2A24">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ポモドーロ">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="./icon.svg">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<style>
+:root{
+  --paper:#EEF0EA; --sheet:#F9FAF6; --ink:#1F2A24; --sub:#5E6A61; --rule:#CBD2C8;
+  --work:#27415E; --ex:#2F7A4A; --rest:#B07D2A; --long:#7A5AA0; --warn:#B3283C; --gold:#B8912A;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:"BIZ UDPGothic","Hiragino Sans","Noto Sans JP",sans-serif;font-size:15px;line-height:1.6;
+  padding-bottom:calc(64px + env(safe-area-inset-bottom));-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--work);outline-offset:2px}
+.wrap{max-width:640px;margin:0 auto;padding:calc(.9rem + env(safe-area-inset-top)) 1rem 2rem}
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;padding-bottom:.6rem;border-bottom:2px solid var(--ink);margin-bottom:.9rem}
+.head h1{margin:0;font-size:1.35rem;letter-spacing:.12em}
+.head .sub{color:var(--sub);font-size:.84rem;text-align:right}
+.card{background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:.8rem .9rem;margin:0 0 1rem}
+.card h2{margin:0 0 .5rem;font-size:1rem;letter-spacing:.06em;display:flex;justify-content:space-between;align-items:baseline;gap:.5rem}
+.card h2 small{font-weight:400;color:var(--sub);font-size:.78rem}
+.view[hidden]{display:none}
+.btn{border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:6px;padding:.5rem 1.1rem;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.sm{padding:.25rem .7rem;font-size:.86rem}
+.btn:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.f{margin:.35rem 0}.f label{display:block;font-size:.76rem;color:var(--sub);margin-bottom:.15rem}
+.f input,.f select,.f textarea{width:100%;padding:.4rem .5rem;border:1px solid var(--rule);border-radius:5px;background:#fff}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(8.5rem,1fr));gap:.4rem .7rem}
+.status{font-size:.84rem;color:var(--sub)}.status.err{color:var(--warn)}
+.note{font-size:.8rem;color:var(--sub);margin:.2rem 0}
+
+/* 階級の帯 */
+.rankbar{display:flex;align-items:center;gap:.8rem;background:var(--ink);color:#EEF0EA;border-radius:8px;padding:.65rem .85rem;margin:0 0 1rem}
+.insig{flex:0 0 auto;width:46px;height:46px}
+.rk-name{font-size:1.15rem;font-weight:700;letter-spacing:.08em}
+.rk-unit{font-size:.74rem;opacity:.75}
+.rk-prog{height:6px;background:rgba(255,255,255,.18);border-radius:3px;overflow:hidden;margin-top:.3rem}
+.rk-prog i{display:block;height:100%;background:var(--gold)}
+.rk-next{font-size:.72rem;opacity:.8;margin-top:.15rem}
+.rk-medals{margin-left:auto;text-align:right;font-size:.8rem}
+
+/* タイマー */
+.timer{text-align:center;padding:1rem .5rem 1.1rem;border-radius:12px;color:#fff;background:var(--work);margin:0 0 1rem;position:relative;overflow:hidden}
+.timer.ph-ex{background:var(--ex)}.timer.ph-rest{background:var(--rest)}.timer.ph-long{background:var(--long)}.timer.ph-idle{background:#4A554D}
+.ph-label{font-size:.9rem;letter-spacing:.3em;opacity:.9}
+.clock{font-size:4.2rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.04em;line-height:1.15;margin:.15rem 0}
+.ph-sub{font-size:.84rem;opacity:.9;min-height:1.3em}
+.ring{position:absolute;left:0;bottom:0;height:5px;background:rgba(255,255,255,.55)}
+.ctrl{display:flex;gap:.5rem;justify-content:center;margin-top:.7rem;flex-wrap:wrap}
+.ctrl button{border:1px solid rgba(255,255,255,.75);background:rgba(255,255,255,.12);color:#fff;border-radius:999px;padding:.4rem 1.1rem;cursor:pointer}
+.ctrl button.main{background:#fff;color:var(--ink);border-color:#fff;font-weight:700;padding:.45rem 1.6rem}
+.cycles{display:flex;justify-content:center;gap:.35rem;margin-top:.6rem}
+.cycles span{width:.7rem;height:.7rem;border-radius:50%;border:1.5px solid rgba(255,255,255,.8)}
+.cycles span.on{background:#fff}
+.fields{display:flex;flex-wrap:wrap;gap:.35rem}
+.fields button{border:1.5px solid var(--fc);color:var(--fc);background:#fff;border-radius:999px;padding:.2rem .85rem;cursor:pointer;font-weight:700}
+.fields button[aria-pressed="true"]{background:var(--fc);color:#fff}
+.hp{display:flex;align-items:center;gap:.6rem}
+.hp-bar{flex:1;height:12px;border-radius:6px;background:#DDE3DA;overflow:hidden}
+.hp-bar i{display:block;height:100%;background:var(--ex);transition:width .4s}
+.hp-bar i.mid{background:var(--rest)}.hp-bar i.low{background:var(--warn)}
+.debt{font-size:.82rem;margin-top:.35rem}.debt b{color:var(--warn)}
+.exbox{background:#fff;color:var(--ink);border-radius:8px;padding:.6rem .7rem;margin:.7rem auto 0;max-width:24rem;text-align:left}
+.exbox .exn{font-weight:700;font-size:1.05rem}
+.exbox .row{margin-top:.4rem}
+.notebox{background:#fff;color:var(--ink);border-radius:8px;padding:.5rem .6rem;margin:.6rem auto 0;max-width:24rem;text-align:left}
+.notebox input{width:100%;padding:.35rem .5rem;border:1px solid var(--rule);border-radius:5px}
+
+/* BGM */
+.bgm-player{width:100%;max-width:360px;aspect-ratio:16/9;background:#000;border-radius:6px;overflow:hidden;margin:.3rem 0}
+.bgm-player iframe,.bgm-player > div{width:100%;height:100%;display:block}
+.bgm-list{list-style:none;margin:.3rem 0 0;padding:0}
+.bgm-list li{display:flex;gap:.5rem;align-items:center;padding:.35rem 0;border-bottom:1px solid var(--rule);font-size:.88rem}
+.bgm-list li:last-child{border-bottom:none}
+.bgm-list .bt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bgm-list .tag{font-size:.7rem;border:1px solid var(--rule);border-radius:3px;padding:0 .3rem;color:var(--sub);white-space:nowrap}
+.bgm-list li.now .bt{font-weight:700;color:var(--work)}
+.linkbtn{border:none;background:none;color:var(--work);cursor:pointer;padding:0;font-size:.82rem;text-decoration:underline}
+.linkbtn.del{color:var(--warn)}
+
+/* 戦況 */
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden;margin:0 0 .6rem}
+.seg button{border:none;background:#fff;padding:.3rem .9rem;cursor:pointer;color:var(--sub)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.fbar{display:grid;grid-template-columns:5.5rem 1fr 4.2rem;gap:.5rem;align-items:center;font-size:.86rem;margin:.25rem 0}
+.fbar .bar{height:12px;background:#E3E8E0;border-radius:6px;overflow:hidden}.fbar .bar i{display:block;height:100%}
+.fbar .v{text-align:right;font-variant-numeric:tabular-nums;color:var(--sub)}
+.days{display:flex;align-items:flex-end;gap:3px;height:90px;margin:.4rem 0 .1rem}
+.days span{flex:1;background:var(--work);border-radius:2px 2px 0 0;min-height:1px;position:relative}
+.days span.today{background:var(--gold)}
+.dlab{display:flex;gap:3px;font-size:.6rem;color:var(--sub)}.dlab span{flex:1;text-align:center}
+.heat{display:grid;grid-template-rows:repeat(7,11px);grid-auto-flow:column;grid-auto-columns:11px;gap:3px;margin:.3rem 0}
+.heat span{border-radius:2px;background:#E3E8E0}
+.heat span.l1{background:#B9D6C2}.heat span.l2{background:#7DB592}.heat span.l3{background:#3E8A5C}.heat span.l4{background:#1F5C38}
+.heat span.goal{outline:1.5px solid var(--gold);outline-offset:-1.5px}
+.streak{display:flex;gap:1rem;flex-wrap:wrap;font-size:.86rem}.streak b{font-size:1.4rem;font-variant-numeric:tabular-nums}
+.terr{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;max-width:220px;margin:.3rem 0}
+.terr span{aspect-ratio:1;border-radius:2px;background:#E3E8E0}
+.terr span.on{background:var(--fc)}
+.terr-head{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;font-size:.86rem}
+.terr-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:.9rem}
+.dan{font-size:.74rem;border:1px solid var(--fc);color:var(--fc);border-radius:3px;padding:0 .35rem;font-weight:700}
+.report{border-left:4px solid var(--gold);background:#fff;border-radius:6px;padding:.6rem .8rem}
+.report .big{font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums}
+.report ul{margin:.3rem 0;padding-left:1.1rem;font-size:.88rem}
+.log{list-style:none;margin:0;padding:0;font-size:.84rem}
+.log li{display:flex;gap:.5rem;padding:.3rem 0;border-bottom:1px dashed var(--rule)}
+.log li .t{color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap}
+.log li .dot{width:.6rem;height:.6rem;border-radius:50%;background:var(--fc);margin-top:.45rem;flex:0 0 auto}
+.medal{display:inline-flex;align-items:center;gap:.2rem;border:1px solid var(--gold);color:var(--gold);border-radius:999px;padding:0 .45rem;font-size:.76rem;margin:.1rem .2rem 0 0}
+
+/* 設定 */
+.flist .fitem{display:grid;grid-template-columns:2.4rem 1fr auto;gap:.4rem;align-items:center;margin:.25rem 0}
+.flist input[type=color]{width:2.4rem;height:2rem;padding:0;border:1px solid var(--rule);border-radius:4px;background:#fff}
+.flist input[type=text]{padding:.35rem .5rem;border:1px solid var(--rule);border-radius:5px}
+
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--sheet);border-top:1px solid var(--rule);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav.tabs button{flex:1;border:none;background:none;padding:.8rem 0;cursor:pointer;color:var(--sub);font-weight:700;font-size:.9rem}
+nav.tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 3px 0 var(--ink)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom));background:var(--ink);color:#fff;border-radius:8px;padding:.6rem .9rem;font-size:.9rem;z-index:20;max-width:calc(100% - 2rem);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+.toast[hidden]{display:none}
+.promo{position:fixed;inset:0;background:rgba(20,26,22,.6);display:flex;align-items:center;justify-content:center;z-index:30}
+.promo[hidden]{display:none}
+.promo .pc{background:var(--sheet);border-radius:12px;padding:1.2rem 1.4rem;text-align:center;max-width:20rem;animation:pop .5s ease}
+.promo .pc .insig{width:84px;height:84px;margin:0 auto .4rem;display:block}
+.promo .pc h3{margin:.2rem 0;font-size:1.3rem;letter-spacing:.1em}
+@keyframes pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.05);opacity:1}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section class="view" id="view-camp">
+    <header class="head"><h1>ポモドーロ</h1><div class="sub" id="today-sub">—</div></header>
+    <div class="rankbar" id="rankbar"></div>
+    <div class="timer ph-idle" id="timer"></div>
+    <div class="card"><h2>分野<small>始める前に選ぶ</small></h2><div class="fields" id="field-pick"></div></div>
+    <div class="card"><h2>体力<small id="hp-sub"></small></h2><div class="hp"><div class="hp-bar"><i id="hp-fill"></i></div><b id="hp-num">—</b></div><div class="debt" id="debt"></div></div>
+    <div class="card"><h2>作業用BGM<small id="bgm-sub"></small></h2>
+      <div class="bgm-player"><div id="yt"></div></div>
+      <div class="row"><button type="button" class="btn ghost sm" id="bgm-toggle">再生</button><button type="button" class="btn ghost sm" id="bgm-next">次の曲</button>
+        <label class="note" style="display:flex;align-items:center;gap:.3rem">音量<input id="bgm-vol" type="range" min="0" max="100" value="40"></label></div>
+      <ul class="bgm-list" id="bgm-now"></ul>
+    </div>
+    <div class="card"><h2>今日の記録<small id="today-count"></small></h2><ul class="log" id="today-log"></ul></div>
+  </section>
+
+  <section class="view" id="view-war" hidden>
+    <header class="head"><h1>戦況</h1><div class="sub">これまでの積み上げ</div></header>
+    <div class="card"><h2>戦況報告<small id="rep-day"></small></h2><div id="report"></div></div>
+    <div class="card"><h2>連戦</h2><div id="streak"></div></div>
+    <div class="card"><h2>分野ごとの時間</h2><div class="seg" id="span-seg"><button type="button" data-span="day" aria-pressed="true">今日</button><button type="button" data-span="week" aria-pressed="false">今週</button><button type="button" data-span="month" aria-pressed="false">今月</button><button type="button" data-span="all" aria-pressed="false">すべて</button></div><div id="by-field"></div>
+      <div class="days" id="days"></div><div class="dlab" id="dlab"></div><p class="note">直近14日の作業時間</p></div>
+    <div class="card"><h2>分野の領土<small>25分で1マス、100マスで1州</small></h2><div class="terr-wrap" id="terr"></div></div>
+    <div class="card"><h2>部隊と勲章</h2><div id="medals"></div></div>
+  </section>
+
+  <section class="view" id="view-set" hidden>
+    <header class="head"><h1>設定</h1><div class="sub" id="ver"></div></header>
+    <div class="card"><h2>時間</h2><div class="grid2">
+      <div class="f"><label for="s-work">作業(分)</label><input id="s-work" type="number" min="1" max="180"></div>
+      <div class="f"><label for="s-ex">運動(分)</label><input id="s-ex" type="number" min="0" max="60"></div>
+      <div class="f"><label for="s-rest">休憩(分)</label><input id="s-rest" type="number" min="0" max="60"></div>
+      <div class="f"><label for="s-long">長い休憩(分)</label><input id="s-long" type="number" min="0" max="120"></div>
+      <div class="f"><label for="s-every">長い休憩は何回ごと</label><input id="s-every" type="number" min="2" max="12"></div>
+      <div class="f"><label for="s-goal">1日の目標(回)</label><input id="s-goal" type="number" min="1" max="30"></div>
+      <div class="f"><label for="s-debt">運動が必要になる作業(分)</label><input id="s-debt" type="number" min="10" max="300"></div>
+      <div class="f"><label for="s-auto">次へ自動で進む</label><select id="s-auto"><option value="1">進む</option><option value="0">止まって待つ</option></select></div>
+    </div></div>
+    <div class="card"><h2>分野</h2><div class="flist" id="f-list"></div><button type="button" class="btn ghost sm" id="f-add">分野を足す</button></div>
+    <div class="card"><h2>運動の候補<small>1行に1つ</small></h2><textarea id="s-exlist" rows="6" style="width:100%;padding:.4rem .5rem;border:1px solid var(--rule);border-radius:5px"></textarea>
+      <p class="note">運動のときに、この中から1つ出します。鍛錬のアプリもその場で開けます。</p></div>
+    <div class="card"><h2>作業用BGM<small>YouTubeの動画・再生リストのURL</small></h2>
+      <div class="f"><label for="b-url">URL</label><input id="b-url" type="url" placeholder="https://www.youtube.com/watch?v=… や …&list=…"></div>
+      <div class="grid2">
+        <div class="f"><label for="b-title">名前(任意)</label><input id="b-title" type="text" placeholder="雨音のカフェ"></div>
+        <div class="f"><label for="b-role">流すとき</label><select id="b-role"><option value="work">作業中</option><option value="rest">休憩中</option></select></div>
+        <div class="f"><label for="b-field">分野</label><select id="b-field"></select></div>
+      </div>
+      <button type="button" class="btn sm" id="b-add">足す</button>
+      <ul class="bgm-list" id="b-list"></ul></div>
+    <div class="card"><h2>接続<small>GitHub</small></h2>
+      <p class="note">記録は notion-daily の roadmap/apps/pomodoro に置き、どの端末からでも続きができます。つながらないあいだは端末に残し、つながったら書き込みます。</p>
+      <div class="grid2">
+        <div class="f"><label for="c-owner">ユーザー名</label><input id="c-owner" autocomplete="off"></div>
+        <div class="f"><label for="c-repo">リポジトリ</label><input id="c-repo" autocomplete="off"></div>
+        <div class="f"><label for="c-branch">ブランチ</label><input id="c-branch" autocomplete="off"></div>
+      </div>
+      <div class="f"><label for="c-token">トークン</label><input id="c-token" type="password" autocomplete="off"></div>
+      <div class="row"><button type="button" class="btn" id="connect">接続して読み込む</button><span class="status" id="conn-status"></span></div>
+      <p class="note">今開いている版:<b id="app-version"></b></p></div>
+    <div class="row"><button type="button" class="btn" id="save-set">設定を保存する</button><span class="status" id="set-status"></span></div>
+  </section>
+
+</div>
+<div class="toast" id="toast" hidden></div>
+<div class="promo" id="promo" hidden></div>
+<nav class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-view="camp">タイマー</button>
+  <button role="tab" aria-selected="false" data-view="war">戦況</button>
+  <button role="tab" aria-selected="false" data-view="set">設定</button>
+</nav>
+<script>
+(function(){
+"use strict";
+const APP_VERSION = "2026-10-12 r1";
+const DATA = "roadmap/apps/pomodoro/data.json", LOGDIR = "roadmap/apps/pomodoro/log";
+const KEY_CONN = "pomodoro-conn", KEY_LOCAL = "pomodoro-local", KEY_RUN = "pomodoro-run";
+const TANREN = "https://nisenonamae.github.io/tanren/";
+
+/* ───────── 決まり ───────── */
+// 階級:戦果の累計で上がる。元帥の先は星が増え続ける。元帥になったら「再編成」で新しい部隊として二等兵からやり直せる(前の部隊は勲章として残る)
+const RANKS = [["二等兵", 0], ["一等兵", 50], ["上等兵", 120], ["兵長", 220], ["伍長", 350], ["軍曹", 520], ["曹長", 740], ["准尉", 1000],
+  ["少尉", 1350], ["中尉", 1800], ["大尉", 2350], ["少佐", 3000], ["中佐", 3800], ["大佐", 4800], ["少将", 6000], ["中将", 7500], ["大将", 9300], ["元帥", 11500]];
+const STAR_STEP = 2500;
+// 分野ごとの段位:その分野に積んだ時間(時間)。名人の先は星
+const DANS = [["見習い", 0], ["初段", 5], ["二段", 15], ["三段", 30], ["四段", 50], ["五段", 80], ["六段", 120], ["七段", 170], ["八段", 230], ["九段", 300], ["名人", 400]];
+const DAN_STAR = 100;
+const UNIT_NAMES = ["第1連隊", "第2連隊", "第3連隊", "第4連隊", "第5連隊", "第6連隊", "第7連隊", "第8連隊", "第9連隊", "第10連隊"];
+const unitName = n => UNIT_NAMES[n] || ("第" + (n + 1) + "連隊");
+const CELL_MIN = 25, REGION = 100;
+// 体力:作業で減り、運動と休憩で戻る。何もしていない間も少しずつ戻る
+const HP = { workPerMin: 1.2, exDone: 35, restPerMin: 1, idlePerMin: 1 / 3 };
+const multOf = hp => hp >= 60 ? 1 : hp >= 30 ? 0.75 : 0.5;
+const EX_BONUS = 5, GOAL_BONUS = 20;
+const DEFAULTS = { version: 1, work: 25, ex: 5, rest: 5, long: 15, every: 4, goal: 8, debt: 50, auto: true,
+  fields: [{ id: "f1", name: "数学", color: "#27415E" }, { id: "f2", name: "英語", color: "#B3283C" }, { id: "f3", name: "国語", color: "#2F7A4A" }, { id: "f4", name: "そのほか", color: "#7A5AA0" }],
+  exercises: ["首と肩を回す(1分)", "スクワット10回", "立って背伸びとストレッチ", "目を閉じて遠くを見る", "その場で足踏み2分", "壁腕立て10回", "鍛錬のメニューを1つ"],
+  bgm: [], reorg: [], hp: { v: 100, at: 0 } };
+
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+// 1日は朝5時で区切る(ほかのアプリと同じ)
+const taskDay = (t) => new Date((t || Date.now()) + 4 * 3600e3).toISOString().slice(0, 10);
+const addDays = (d, n) => new Date(Date.parse(d + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+const hm = t => new Date(t + 9 * 3600e3).toISOString().slice(11, 16);
+const fmtMin = m => { m = Math.round(m); const h = Math.floor(m / 60), r = m % 60; return h ? h + "時間" + (r ? r + "分" : "") : r + "分"; };
+const clock = s => { s = Math.max(0, Math.ceil(s)); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+// YouTubeのURLから、動画か再生リストを取り出す
+function parseYT(url){
+  url = String(url || "").trim(); if (!url) return null;
+  const list = /[?&]list=([\w-]+)/.exec(url);
+  const v = /[?&]v=([\w-]{11})/.exec(url) || /youtu\.be\/([\w-]{11})/.exec(url) || /\/(?:shorts|live|embed)\/([\w-]{11})/.exec(url);
+  if (list && !v) return { kind: "list", id: list[1] };
+  if (v) return { kind: "video", id: v[1], list: list ? list[1] : null };
+  if (/^[\w-]{11}$/.test(url)) return { kind: "video", id: url };
+  return null;
+}
+
+// 記録(月ごとのファイルを合わせたもの)から、いろいろな数を出す。記録はすべて「その日の行」の並び
+function allEntries(logs){ const out = []; for (const m of Object.keys(logs || {}).sort()) for (const e of (logs[m].entries || [])) out.push(e); return out; }
+const works = es => es.filter(e => e.type === "work");
+function totalGain(es){ return es.reduce((s, e) => s + (+e.gain || 0), 0); }
+function rankOf(total, reorg){
+  const base = (reorg && reorg.length) ? reorg[reorg.length - 1].at : 0, t = Math.max(0, total - base);
+  let i = 0; for (let k = 0; k < RANKS.length; k++) if (t >= RANKS[k][1]) i = k;
+  const top = RANKS.length - 1, stars = i === top ? Math.floor((t - RANKS[top][1]) / STAR_STEP) : 0;
+  const lo = i === top ? RANKS[top][1] + stars * STAR_STEP : RANKS[i][1], hi = i === top ? lo + STAR_STEP : RANKS[i + 1][1];
+  return { i, name: RANKS[i][0], stars, top: i === top, t, prog: (t - lo) / (hi - lo), toNext: hi - t,
+    next: i === top ? "元帥★" + (stars + 1) : RANKS[i + 1][0], unit: (reorg || []).length };
+}
+function danOf(min){
+  const h = min / 60; let i = 0; for (let k = 0; k < DANS.length; k++) if (h >= DANS[k][1]) i = k;
+  const top = i === DANS.length - 1, stars = top ? Math.floor((h - DANS[i][1]) / DAN_STAR) : 0;
+  return { name: DANS[i][0] + (stars ? "★" + stars : ""), i, stars };
+}
+function territory(min){ const cells = Math.floor(min / CELL_MIN); return { cells, regions: Math.floor(cells / REGION), inRegion: cells % REGION }; }
+function minutesBy(es, from, to){ // [from, to] の日付の分野ごとの分
+  const out = {}; for (const e of works(es)) if ((!from || e.date >= from) && (!to || e.date <= to)) out[e.field] = (out[e.field] || 0) + (+e.min || 0); return out;
+}
+function dayCount(es, d){ return works(es).filter(e => e.date === d && e.full).length; }
+// 連戦:1日の目標(回)をやりきった日が、今日(まだなら昨日)からさかのぼって何日続いているか
+function streakOf(es, goal, today){
+  const done = new Set(); const cnt = {};
+  for (const e of works(es)) if (e.full) cnt[e.date] = (cnt[e.date] || 0) + 1;
+  Object.keys(cnt).forEach(d => { if (cnt[d] >= goal) done.add(d); });
+  let d = done.has(today) ? today : addDays(today, -1), n = 0;
+  while (done.has(d)) { n++; d = addDays(d, -1); }
+  let best = 0, run = 0, prev = null;
+  for (const x of Array.from(done).sort()) { run = prev && addDays(prev, 1) === x ? run + 1 : 1; best = Math.max(best, run); prev = x; }
+  return { now: n, best, todayDone: done.has(today), days: done };
+}
+// 体力の今の値(何もしていない間に戻った分を足す)
+function hpNow(hp, now){ const idle = Math.max(0, (now - (hp.at || now)) / 60000); return Math.max(0, Math.min(100, (+hp.v || 0) + idle * HP.idlePerMin)); }
+// 運動していない作業の分(最後に運動してから)
+function debtOf(es){ let d = 0; for (const e of es.slice().sort((a, b) => a.at - b.at)) { if (e.type === "work") d += +e.min || 0; if (e.type === "ex" && e.done) d = 0; } return d; }
+
+/* ───────── 状態 ───────── */
+const state = { conn: null, data: clone(DEFAULTS), dataSha: null, logs: {}, logShas: {}, pending: [], field: null, run: null, span: "day", ytReady: false, saving: false };
+function lsGet(k, fb){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
+function lsSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function entries(){ return allEntries(state.logs); }
+function fieldById(id){ return state.data.fields.find(f => f.id === id) || { id, name: "(消した分野)", color: "#888" }; }
+
+/* ───────── GitHub ───────── */
+const b64e = s => { const b = new TextEncoder().encode(s); let x = ""; for (let i = 0; i < b.length; i += 0x8000) x += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(x); };
+const b64d = s => { const bin = atob(String(s).replace(/\s/g, "")), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new TextDecoder().decode(u); };
+const api = p => "https://api.github.com/repos/" + encodeURIComponent(state.conn.owner) + "/" + encodeURIComponent(state.conn.repo) + "/contents/" + p;
+const hdr = x => Object.assign({ "Authorization": "Bearer " + state.conn.token, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" }, x || {});
+async function readJson(p){
+  const r = await fetch(api(p) + "?ref=" + encodeURIComponent(state.conn.branch || "main"), { headers: hdr(), cache: "no-store" });
+  if (r.status === 404) return { data: null, sha: null };
+  if (!r.ok) { const e = new Error("読み込めませんでした(" + r.status + ")"); e.status = r.status; throw e; }
+  const m = await r.json(); return { data: m.content ? JSON.parse(b64d(m.content)) : null, sha: m.sha };
+}
+async function listDir(p){
+  const r = await fetch(api(p) + "?ref=" + encodeURIComponent(state.conn.branch || "main"), { headers: hdr(), cache: "no-store" });
+  if (r.status === 404) return []; if (!r.ok) throw new Error("読み込めませんでした(" + r.status + ")");
+  const l = await r.json(); return Array.isArray(l) ? l : [];
+}
+async function writeJson(p, obj, sha){
+  const body = { message: "pomodoro: 記録", content: b64e(JSON.stringify(obj, null, 1)), branch: state.conn.branch || "main" }; if (sha) body.sha = sha;
+  const r = await fetch(api(p), { method: "PUT", headers: hdr({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
+  if (!r.ok) { const e = new Error("保存できませんでした(" + r.status + ")"); e.status = r.status; throw e; }
+  const o = await r.json(); return o.content && o.content.sha;
+}
+
+/* ───────── 保存(つながらないあいだは端末に残し、つながったら書き込む) ───────── */
+function saveLocal(){ lsSet(KEY_LOCAL, { data: state.data, logs: state.logs, pending: state.pending }); }
+function addEntry(e){
+  const m = e.date.slice(0, 7);
+  const L = state.logs[m] = state.logs[m] || { version: 1, entries: [] };
+  if (!L.entries.some(x => x.id === e.id)) L.entries.push(e);
+  state.pending.push(e); saveLocal(); flush();
+}
+async function flush(){
+  if (state.saving || !state.conn || !state.pending.length) return;
+  state.saving = true;
+  try {
+    while (state.pending.length) {
+      const batch = state.pending.slice(), months = {};
+      batch.forEach(e => (months[e.date.slice(0, 7)] = months[e.date.slice(0, 7)] || []).push(e));
+      for (const [m, es] of Object.entries(months)) {
+        for (let i = 0; i < 3; i++) {
+          try {
+            const r = await readJson(LOGDIR + "/" + m + ".json"), doc = r.data || { version: 1, entries: [] };
+            const have = new Set(doc.entries.map(x => x.id)); es.forEach(e => { if (!have.has(e.id)) doc.entries.push(e); });
+            state.logShas[m] = await writeJson(LOGDIR + "/" + m + ".json", doc, r.sha);
+            const local = (state.logs[m] && state.logs[m].entries) || [], ids = new Set(doc.entries.map(x => x.id));
+            local.forEach(x => { if (!ids.has(x.id)) doc.entries.push(x); });
+            state.logs[m] = doc; break;
+          } catch (err) { if (!(err.status === 409 || err.status === 422) || i === 2) throw err; }
+        }
+      }
+      state.pending = state.pending.filter(e => !batch.includes(e));
+      saveLocal();
+    }
+    setStatus("");
+  } catch (err) { setStatus("記録は端末に残しています。つながったら書き込みます(" + err.message + ")", true); }
+  finally { state.saving = false; }
+}
+async function saveData(){
+  saveLocal();
+  if (!state.conn) return true;
+  for (let i = 0; i < 3; i++) {
+    try { state.dataSha = await writeJson(DATA, state.data, state.dataSha); return true; }
+    catch (err) {
+      if ((err.status === 409 || err.status === 422) && i < 2) { const r = await readJson(DATA); state.dataSha = r.sha; continue; }
+      setStatus(err.message, true); return false;
+    }
+  }
+  return false;
+}
+async function loadAll(){
+  if (!state.conn) return false;
+  const st = document.getElementById("conn-status"); if (st) { st.classList.remove("err"); st.textContent = "読み込んでいます…"; }
+  try {
+    const d = await readJson(DATA);
+    if (d.data) { state.data = Object.assign(clone(DEFAULTS), d.data); state.dataSha = d.sha; }
+    else { state.dataSha = null; await saveData(); }
+    const files = await listDir(LOGDIR), logs = {};
+    for (const f of files.filter(x => /^\d{4}-\d{2}\.json$/.test(x.name))) { const r = await readJson(LOGDIR + "/" + f.name); logs[f.name.slice(0, 7)] = r.data || { entries: [] }; state.logShas[f.name.slice(0, 7)] = r.sha; }
+    // 端末に残っていた、まだ書き込んでいない記録を足す
+    for (const e of state.pending) { const m = e.date.slice(0, 7); logs[m] = logs[m] || { version: 1, entries: [] }; if (!logs[m].entries.some(x => x.id === e.id)) logs[m].entries.push(e); }
+    state.logs = logs; saveLocal();
+    if (st) st.textContent = "読み込みました";
+    flush(); renderAll(); return true;
+  } catch (err) { if (st) { st.classList.add("err"); st.textContent = err.message; } return false; }
+}
+function setStatus(t, err){ const el = document.getElementById("set-status"); if (el) { el.textContent = t; el.classList.toggle("err", !!err); } }
+
+/* ───────── 音(合図) ───────── */
+let actx = null;
+function beep(kind){
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    actx = actx || new AC(); if (actx.state === "suspended") actx.resume();
+    const seq = { work: [[523, 0], [659, .12], [784, .24], [1046, .4]], ex: [[784, 0], [988, .15], [784, .3], [988, .45]], rest: [[880, 0], [660, .2]], promo: [[523, 0], [659, .1], [784, .2], [1046, .35], [1318, .55]] }[kind] || [[880, 0]];
+    seq.forEach(([f, t]) => { const o = actx.createOscillator(), g = actx.createGain(), t0 = actx.currentTime + t; o.type = "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(.18, t0 + .01); g.gain.exponentialRampToValueAtTime(.0001, t0 + .35);
+      o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0 + .4); });
+  } catch (e) {}
+}
+function notify(title, body){ try { if ("Notification" in window && Notification.permission === "granted" && document.hidden) new Notification(title, { body, icon: "./icon-192.png" }); } catch (e) {} }
+
+/* ───────── タイマー ─────────
+   run = { phase: "work"|"ex"|"rest"|"long", endsAt, left(止めているとき), dur, cycle, field, startedAt, exName, exDone, note } */
+const PH = { work: "作業", ex: "運動", rest: "休憩", long: "長い休憩" };
+function saveRun(){ lsSet(KEY_RUN, state.run); }
+function startPhase(phase, cycle){
+  const d = state.data, dur = { work: d.work, ex: d.ex, rest: d.rest, long: d.long }[phase] * 60;
+  if (!(dur > 0)) return nextPhase(phase, cycle, true);
+  const ex = phase === "ex" ? d.exercises[Math.floor(Math.random() * d.exercises.length)] || "体を動かす" : null;
+  state.run = { phase, cycle, dur, endsAt: Date.now() + dur * 1000, left: null, field: state.field, startedAt: Date.now(), exName: ex, exDone: false };
+  saveRun(); beep(phase === "work" ? "work" : phase === "ex" ? "ex" : "rest");
+  bgmFor(phase); renderAll();
+}
+function startWork(){
+  if (!state.field) { toast("先に分野を選んでください"); return; }
+  if ("Notification" in window && Notification.permission === "default") { try { Notification.requestPermission(); } catch (e) {} }
+  startPhase("work", ((state.run && state.run.cycle) || 0));
+}
+function remaining(){ const r = state.run; if (!r) return 0; return r.left != null ? r.left : (r.endsAt - Date.now()) / 1000; }
+function pause(){ const r = state.run; if (!r || r.left != null) return; r.left = remaining(); saveRun(); bgmPause(); renderAll(); }
+function resume(){ const r = state.run; if (!r || r.left == null) return; r.endsAt = Date.now() + r.left * 1000; r.left = null; saveRun(); bgmFor(r.phase); renderAll(); }
+// 作業を終える(途中でも、そこまでの時間を記録する)
+function finishWork(full){
+  const r = state.run, now = Date.now(), min = Math.max(0, Math.round(((full ? r.dur : r.dur - remaining()) / 60) * 10) / 10);
+  const hp0 = hpNow(state.data.hp, r.startedAt), hp1 = Math.max(0, hp0 - min * HP.workPerMin);
+  const mult = multOf(hp1), gain = Math.round(min * mult);
+  const e = { id: uid(), type: "work", date: taskDay(r.startedAt), at: r.startedAt, end: now, min, field: r.field, full: !!full, gain, mult, hp: Math.round(hp1), note: "" };
+  const before = rankOf(totalGain(entries()), state.data.reorg);
+  state.data.hp = { v: hp1, at: now };
+  if (min > 0) addEntry(e);
+  // 1日の目標をやりきったら、その日1回だけ上乗せ
+  const d = e.date, cnt = dayCount(entries(), d);
+  if (full && cnt === state.data.goal && !entries().some(x => x.type === "bonus" && x.date === d)) addEntry({ id: uid(), type: "bonus", date: d, at: now, gain: GOAL_BONUS, why: "1日の目標をやりきった" });
+  saveData();
+  checkPromo(before);
+  state.lastWorkId = min > 0 ? e.id : null;
+  return e;
+}
+function checkPromo(before){
+  const after = rankOf(totalGain(entries()), state.data.reorg);
+  if (after.i > before.i || after.stars > before.stars) showPromo(after);
+}
+function exDone(done){
+  const r = state.run; if (!r || r.phase !== "ex" || r.exDone) return;
+  r.exDone = true; saveRun();
+  const now = Date.now(), before = rankOf(totalGain(entries()), state.data.reorg);
+  addEntry({ id: uid(), type: "ex", date: taskDay(now), at: now, name: r.exName, done: !!done, gain: done ? EX_BONUS : 0 });
+  if (done) { state.data.hp = { v: Math.min(100, hpNow(state.data.hp, now) + HP.exDone), at: now }; saveData(); checkPromo(before); toast("体力が戻りました(+" + HP.exDone + ")"); }
+  else toast("運動を飛ばしました。体の負債が残っています");
+  renderAll();
+}
+function restEnded(min){ const now = Date.now(); state.data.hp = { v: Math.min(100, hpNow(state.data.hp, now) + min * HP.restPerMin), at: now }; saveData(); }
+function nextPhase(phase, cycle, skipped){
+  const d = state.data;
+  if (phase === "work") return startPhase(d.ex > 0 ? "ex" : ((cycle + 1) % d.every === 0 ? "long" : "rest"), cycle);
+  if (phase === "ex") return startPhase((cycle + 1) % d.every === 0 ? "long" : "rest", cycle);
+  // 休憩が終わったら次の作業(自動で進まない設定なら待つ)
+  const next = cycle + 1;
+  if (d.auto && state.field) return startPhase("work", next % d.every === 0 && phase === "long" ? 0 : next);
+  state.run = { phase: "idle", cycle: phase === "long" ? 0 : next }; saveRun(); bgmPause(); renderAll();
+}
+function phaseEnd(){
+  const r = state.run; if (!r || r.left != null || !r.phase || r.phase === "idle") return;
+  if (r.phase === "work") { finishWork(true); notify("作業の時間が終わりました", "運動の時間です"); }
+  else if (r.phase === "ex") { if (!r.exDone) exDone(false); notify("運動の時間が終わりました", "休憩です"); }
+  else { restEnded(r.dur / 60); notify("休憩が終わりました", "次の作業へ"); }
+  nextPhase(r.phase, r.cycle);
+}
+function skip(){
+  const r = state.run; if (!r || !r.phase || r.phase === "idle") return;
+  if (r.phase === "work") finishWork(false);
+  else if (r.phase === "ex" && !r.exDone) exDone(false);
+  else if (r.phase === "rest" || r.phase === "long") restEnded((r.dur - remaining()) / 60);
+  nextPhase(r.phase, r.cycle, true);
+}
+function stopAll(){
+  const r = state.run;
+  if (r && r.phase === "work" && remaining() < r.dur - 30) finishWork(false);
+  state.run = null; saveRun(); bgmPause(); renderAll();
+}
+function reorganize(){
+  const rk = rankOf(totalGain(entries()), state.data.reorg);
+  if (!rk.top) return;
+  if (!confirm("再編成しますか。今の部隊(" + unitName(rk.unit) + "・" + rk.name + (rk.stars ? "★" + rk.stars : "") + ")は勲章として残り、新しい部隊として二等兵から始めます。")) return;
+  state.data.reorg = (state.data.reorg || []).concat([{ at: totalGain(entries()), date: taskDay(), unit: unitName(rk.unit), rank: rk.name + (rk.stars ? "★" + rk.stars : "") }]);
+  saveData(); renderAll(); toast(unitName(rk.unit + 1) + "を編成しました");
+}
+
+/* ───────── BGM(YouTube) ───────── */
+let yt = null, ytWant = null, bgmIdx = {}, bgmPlaying = false;
+function bgmListFor(role){
+  const all = state.data.bgm || [], f = state.field;
+  const mine = all.filter(b => b.role === role && b.field && b.field === f);
+  return mine.length ? mine : all.filter(b => b.role === role && !b.field);
+}
+function loadYT(){
+  if (window.YT && window.YT.Player) { onYT(); return; }
+  if (document.getElementById("yt-api")) return;
+  const s = document.createElement("script"); s.id = "yt-api"; s.src = "https://www.youtube.com/iframe_api"; document.head.appendChild(s);
+  window.onYouTubeIframeAPIReady = onYT;
+}
+function onYT(){
+  if (yt || !document.getElementById("yt")) return;
+  yt = new window.YT.Player("yt", { width: "100%", height: "100%", playerVars: { playsinline: 1, rel: 0 },
+    events: { onReady: () => { state.ytReady = true; try { yt.setVolume(+document.getElementById("bgm-vol").value); } catch (e) {} if (ytWant) playItem(ytWant); },
+      onStateChange: ev => { bgmPlaying = ev.data === 1; const b = document.getElementById("bgm-toggle"); if (b) b.textContent = bgmPlaying ? "止める" : "再生";
+        if (ev.data === 0 && ytWant && ytWant.kind === "video") bgmNext(); } } });
+}
+function playItem(b){
+  ytWant = b; renderBgmNow();
+  if (!state.ytReady || !yt) { loadYT(); return; }
+  try { if (b.kind === "list") yt.loadPlaylist({ list: b.id, listType: "playlist" }); else yt.loadVideoById(b.id); } catch (e) {}
+}
+function bgmFor(phase){
+  const role = phase === "work" ? "work" : (phase === "rest" || phase === "long") ? "rest" : null;
+  const list = role ? bgmListFor(role) : [];
+  if (!list.length) { bgmPause(); return; }
+  const k = role + "|" + (state.field || ""), i = (bgmIdx[k] || 0) % list.length;
+  const b = list[i];
+  if (ytWant && ytWant.id === b.id && state.ytReady) { try { yt.playVideo(); } catch (e) {} renderBgmNow(); return; }
+  playItem(b);
+}
+function bgmPause(){ try { if (yt && state.ytReady) yt.pauseVideo(); } catch (e) {} }
+function bgmNext(){
+  const r = state.run, role = r && (r.phase === "rest" || r.phase === "long") ? "rest" : "work", list = bgmListFor(role);
+  if (!list.length) return;
+  if (ytWant && ytWant.kind === "list" && yt && state.ytReady) { try { yt.nextVideo(); return; } catch (e) {} }
+  const k = role + "|" + (state.field || ""); bgmIdx[k] = ((bgmIdx[k] || 0) + 1) % list.length; playItem(list[bgmIdx[k]]);
+}
+
+/* ───────── 階級章(絵) ───────── */
+function insignia(rk){
+  const i = rk.i, gold = "#D8B24A", red = "#B3283C", navy = "#27415E";
+  let inner = "";
+  const star = (cx, cy, r, fill) => { let p = ""; for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * .45 : r; p += (k ? "L" : "M") + (cx + rr * Math.cos(a)).toFixed(1) + " " + (cy + rr * Math.sin(a)).toFixed(1); } return '<path d="' + p + 'Z" fill="' + fill + '"/>'; };
+  if (i <= 3) { // 兵:山形の数
+    inner = '<rect x="4" y="4" width="40" height="40" rx="6" fill="' + red + '"/>';
+    for (let k = 0; k <= i; k++) inner += '<path d="M12 ' + (32 - k * 7) + ' L24 ' + (24 - k * 7) + ' L36 ' + (32 - k * 7) + '" stroke="' + gold + '" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+  } else if (i <= 7) { // 下士官・准尉:横線と星
+    inner = '<rect x="4" y="4" width="40" height="40" rx="6" fill="' + red + '"/><rect x="8" y="21" width="32" height="4" fill="' + gold + '"/>';
+    for (let k = 0; k < i - 3; k++) inner += star(12 + k * 8 + (4 - (i - 3)) * 4, 14, 3.4, gold);
+  } else if (i <= 13) { // 尉官・佐官:線1本(尉)か2本(佐)と星
+    const bars = i <= 10 ? 1 : 2, stars = (i - 8) % 3 + 1;
+    inner = '<rect x="4" y="4" width="40" height="40" rx="6" fill="' + navy + '"/>';
+    for (let b = 0; b < bars; b++) inner += '<rect x="4" y="' + (bars === 1 ? 22 : 18 + b * 8) + '" width="40" height="3" fill="' + gold + '"/>';
+    for (let k = 0; k < stars; k++) inner += star(24 + (k - (stars - 1) / 2) * 11, 12, 4, "#fff");
+  } else if (i <= 16) { // 将官:金地に星
+    const stars = i - 13;
+    inner = '<rect x="4" y="4" width="40" height="40" rx="6" fill="' + gold + '"/><path d="M8 34 Q24 40 40 34" stroke="' + navy + '" stroke-width="2.5" fill="none"/>';
+    for (let k = 0; k < stars; k++) inner += star(24 + (k - (stars - 1) / 2) * 12, 20, 5, navy);
+  } else { // 元帥:月桂と大きな星
+    inner = '<circle cx="24" cy="24" r="21" fill="' + gold + '"/><path d="M12 32 Q8 22 14 12 M36 32 Q40 22 34 12" stroke="#5E7A2E" stroke-width="3" fill="none" stroke-linecap="round"/>' + star(24, 23, 9, red);
+  }
+  return '<svg class="insig" viewBox="0 0 48 48" aria-hidden="true">' + inner + "</svg>";
+}
+
+/* ───────── 描画 ───────── */
+function renderRank(){
+  const es = entries(), total = totalGain(es), rk = rankOf(total, state.data.reorg);
+  document.getElementById("rankbar").innerHTML = insignia(rk) +
+    '<div style="flex:1;min-width:0"><div class="rk-unit">' + esc(unitName(rk.unit)) + "</div><div class=\"rk-name\">" + esc(rk.name) + (rk.stars ? " ★" + rk.stars : "") + "</div>" +
+    '<div class="rk-prog"><i style="width:' + Math.round(rk.prog * 100) + '%"></i></div><div class="rk-next">' + esc(rk.next) + "まで あと" + Math.ceil(rk.toNext) + "の戦果</div></div>" +
+    '<div class="rk-medals">戦果<br><b style="font-size:1.1rem">' + Math.round(rk.t) + "</b>" + ((state.data.reorg || []).length ? "<br>勲章 " + state.data.reorg.length : "") +
+    (rk.top ? '<br><button type="button" class="btn sm" style="margin-top:.3rem;background:#B8912A;border-color:#B8912A" data-reorg>再編成</button>' : "") + "</div>";
+}
+function renderTimer(){
+  const r = state.run, box = document.getElementById("timer"), d = state.data, ph = r && r.phase && r.phase !== "idle" ? r.phase : "idle";
+  box.className = "timer ph-" + ph;
+  const left = ph === "idle" ? d.work * 60 : remaining(), paused = r && r.left != null;
+  const cyc = r ? r.cycle % d.every : 0;
+  let sub = "";
+  if (ph === "idle") sub = state.field ? fieldById(state.field).name + "で始めます" : "分野を選んで始めます";
+  else if (ph === "work") sub = fieldById(r.field).name + (paused ? "(止めています)" : "");
+  else if (ph === "ex") sub = "体を動かして、体力を戻します";
+  else sub = "目と体を休めます" + (paused ? "(止めています)" : "");
+  let extra = "";
+  if (ph === "ex") extra = '<div class="exbox"><div class="note" style="margin:0">今回の運動</div><div class="exn">' + esc(r.exName) + "</div>" +
+    (r.exDone ? '<div class="note">記録しました</div>' : '<div class="row"><button type="button" class="btn sm" data-ex-done>やった(体力+' + HP.exDone + ')</button><button type="button" class="btn ghost sm" data-ex-skip>飛ばす</button><a class="linkbtn" href="' + TANREN + '" target="_blank" rel="noopener">鍛錬を開く</a></div>') + "</div>";
+  if ((ph === "ex" || ph === "rest" || ph === "long") && state.lastWorkId) extra += '<div class="notebox"><div class="note" style="margin:0 0 .2rem">さっきの作業でやったこと(任意)</div><input id="note-in" placeholder="例:青チャート例題30〜35" value="' + esc((works(entries()).find(e => e.id === state.lastWorkId) || {}).note || "") + '"></div>';
+  box.innerHTML = '<div class="ph-label">' + (ph === "idle" ? "待機" : PH[ph]) + '</div><div class="clock" id="clock">' + clock(left) + '</div><div class="ph-sub">' + esc(sub) + "</div>" +
+    '<div class="cycles">' + Array.from({ length: d.every }, (_, k) => '<span class="' + (k < cyc || (ph !== "idle" && ph !== "work" && k === cyc) ? "on" : "") + '"></span>').join("") + "</div>" +
+    '<div class="ctrl">' + (ph === "idle" ? '<button type="button" class="main" data-start>作業を始める</button>'
+      : (paused ? '<button type="button" class="main" data-resume>続ける</button>' : '<button type="button" class="main" data-pause>止める</button>') +
+        '<button type="button" data-skip>' + (ph === "work" ? "作業を終える" : "次へ") + '</button><button type="button" data-stop>やめる</button>') + "</div>" + extra +
+    '<div class="ring" id="ring" style="width:' + (ph === "idle" ? 0 : Math.round((1 - left / r.dur) * 100)) + '%"></div>';
+}
+function tickTimer(){
+  const r = state.run; if (!r || !r.phase || r.phase === "idle") { document.title = "ポモドーロ"; return; }
+  const left = remaining();
+  const c = document.getElementById("clock"), g = document.getElementById("ring");
+  if (c) c.textContent = clock(left); if (g) g.style.width = Math.round((1 - left / r.dur) * 100) + "%";
+  document.title = clock(left) + " " + PH[r.phase] + "|ポモドーロ";
+  if (r.left == null && left <= 0) phaseEnd();
+}
+function renderFields(){
+  const fs = state.data.fields;
+  if (!state.field || !fs.some(f => f.id === state.field)) state.field = fs.length ? (lsGet("pomodoro-field", null) || fs[0].id) : null;
+  if (!fs.some(f => f.id === state.field)) state.field = fs.length ? fs[0].id : null;
+  const locked = state.run && state.run.phase === "work";
+  document.getElementById("field-pick").innerHTML = fs.map(f => '<button type="button" style="--fc:' + esc(f.color) + '" data-field="' + esc(f.id) + '" aria-pressed="' + (f.id === state.field) + '"' + (locked ? " disabled" : "") + ">" + esc(f.name) + "</button>").join("") || '<span class="note">設定で分野を足してください</span>';
+}
+function renderHp(){
+  const now = Date.now(), r = state.run;
+  let hp = hpNow(state.data.hp, now);
+  if (r && r.phase === "work" && r.left == null) hp = Math.max(0, hpNow(state.data.hp, r.startedAt) - ((r.dur - remaining()) / 60) * HP.workPerMin);
+  const i = document.getElementById("hp-fill"); i.style.width = Math.round(hp) + "%"; i.className = hp >= 60 ? "" : hp >= 30 ? "mid" : "low";
+  document.getElementById("hp-num").textContent = Math.round(hp);
+  document.getElementById("hp-sub").textContent = "戦果 ×" + multOf(hp) + (hp < 60 ? "(運動と休憩で戻すと、戦果が満額に)" : "");
+  const debt = debtOf(entries()) + (r && r.phase === "work" ? (r.dur - remaining()) / 60 : 0);
+  document.getElementById("debt").innerHTML = "体の負債:" + (debt >= state.data.debt ? "<b>" + fmtMin(debt) + "(運動が必要です)</b>" : fmtMin(debt) + " / " + state.data.debt + "分で運動が必要");
+}
+function renderBgmNow(){
+  const r = state.run, role = r && (r.phase === "rest" || r.phase === "long") ? "rest" : "work", list = bgmListFor(role);
+  document.getElementById("bgm-sub").textContent = list.length ? (role === "work" ? "作業中に流す " : "休憩中に流す ") + list.length + "件" : "設定でURLを足すと流れます";
+  document.getElementById("bgm-now").innerHTML = list.map(b => '<li class="' + (ytWant && ytWant.id === b.id ? "now" : "") + '"><span class="bt">' + esc(b.title || (b.kind === "list" ? "再生リスト" : "動画")) + '</span><span class="tag">' + (b.kind === "list" ? "リスト" : "動画") + '</span><button type="button" class="linkbtn" data-bgm-play="' + esc(b.id) + '">流す</button></li>').join("");
+}
+function renderToday(){
+  const d = taskDay(), es = entries().filter(e => e.date === d).sort((a, b) => b.at - a.at);
+  const n = es.filter(e => e.type === "work" && e.full).length, goal = state.data.goal;
+  document.getElementById("today-sub").innerHTML = d.slice(5).replace("-", "/") + "<br>" + n + " / " + goal + "回" + (n >= goal ? " ✓" : "");
+  document.getElementById("today-count").textContent = "作業 " + fmtMin(es.filter(e => e.type === "work").reduce((s, e) => s + e.min, 0)) + "・運動 " + es.filter(e => e.type === "ex" && e.done).length + "回";
+  document.getElementById("today-log").innerHTML = es.length ? es.map(e => {
+    if (e.type === "work") { const f = fieldById(e.field); return '<li style="--fc:' + esc(f.color) + '"><span class="t">' + hm(e.at) + '</span><span class="dot"></span><span>' + esc(f.name) + " " + fmtMin(e.min) + (e.full ? "" : "(途中で終えた)") + (e.note ? "<br><small>" + esc(e.note) + "</small>" : "") + '</span><span class="t" style="margin-left:auto">戦果+' + e.gain + (e.mult < 1 ? "(×" + e.mult + ")" : "") + "</span></li>"; }
+    if (e.type === "ex") return '<li style="--fc:' + (e.done ? "#2F7A4A" : "#B3283C") + '"><span class="t">' + hm(e.at) + '</span><span class="dot"></span><span>' + (e.done ? "運動:" : "運動を飛ばした:") + esc(e.name) + '</span><span class="t" style="margin-left:auto">' + (e.done ? "戦果+" + e.gain : "") + "</span></li>";
+    return '<li style="--fc:#B8912A"><span class="t">' + hm(e.at) + '</span><span class="dot"></span><span>' + esc(e.why || "") + '</span><span class="t" style="margin-left:auto">戦果+' + e.gain + "</span></li>";
+  }).join("") : '<li class="note">まだ記録はありません。分野を選んで、作業を始めましょう。</li>';
+}
+function spanRange(span, today){
+  if (span === "day") return [today, today];
+  if (span === "week") { const wd = (new Date(today + "T00:00:00Z").getUTCDay() + 6) % 7; return [addDays(today, -wd), today]; }
+  if (span === "month") return [today.slice(0, 8) + "01", today];
+  return [null, null];
+}
+function renderWar(){
+  const es = entries(), today = taskDay(), d = state.data;
+  // 戦況報告(今日)
+  const tw = works(es).filter(e => e.date === today), mins = tw.reduce((s, e) => s + e.min, 0);
+  const exs = es.filter(e => e.type === "ex" && e.date === today), gain = es.filter(e => e.date === today).reduce((s, e) => s + (+e.gain || 0), 0);
+  const byF = minutesBy(es, today, today), rk = rankOf(totalGain(es), d.reorg), sk = streakOf(es, d.goal, today);
+  document.getElementById("rep-day").textContent = today.replace(/-/g, "/");
+  document.getElementById("report").innerHTML = '<div class="report"><div class="row" style="gap:1.2rem"><div><div class="note" style="margin:0">作業</div><div class="big">' + fmtMin(mins) + '</div></div><div><div class="note" style="margin:0">やりきった回</div><div class="big">' + tw.filter(e => e.full).length + " / " + d.goal + '</div></div><div><div class="note" style="margin:0">戦果</div><div class="big">+' + gain + "</div></div></div>" +
+    "<ul>" + (Object.keys(byF).length ? Object.entries(byF).sort((a, b) => b[1] - a[1]).map(([f, m]) => "<li>" + esc(fieldById(f).name) + " " + fmtMin(m) + "</li>").join("") : "<li>まだ作業はありません</li>") +
+    "<li>運動 " + exs.filter(e => e.done).length + "回" + (exs.some(e => !e.done) ? "(飛ばした " + exs.filter(e => !e.done).length + "回)" : "") + "</li>" +
+    "<li>" + esc(unitName(rk.unit)) + " " + esc(rk.name) + (rk.stars ? "★" + rk.stars : "") + "。" + esc(rk.next) + "まで あと" + Math.ceil(rk.toNext) + "</li>" +
+    "<li>連戦 " + sk.now + "日" + (sk.todayDone ? "(今日も目標をやりきった)" : tw.filter(e => e.full).length ? "(今日はあと" + (d.goal - tw.filter(e => e.full).length) + "回で目標)" : "") + "</li></ul></div>";
+  // 連戦とヒートマップ(12週)
+  const start = addDays(today, -83 - ((new Date(today + "T00:00:00Z").getUTCDay() + 6) % 7) + 6);
+  const perDay = {}; works(es).forEach(e => perDay[e.date] = (perDay[e.date] || 0) + e.min);
+  let cells = ""; for (let k = 0; k < 84; k++) { const day = addDays(start, k); if (day > today) { cells += '<span style="visibility:hidden"></span>'; continue; }
+    const m = perDay[day] || 0, l = m === 0 ? "" : m < 50 ? "l1" : m < 125 ? "l2" : m < 200 ? "l3" : "l4"; cells += '<span class="' + l + (sk.days.has(day) ? " goal" : "") + '" title="' + day + " " + fmtMin(m) + '"></span>'; }
+  document.getElementById("streak").innerHTML = '<div class="streak"><div>いまの連戦<br><b>' + sk.now + "</b>日</div><div>いちばん長い連戦<br><b>" + sk.best + "</b>日</div><div>1日の目標<br><b>" + d.goal + '</b>回</div></div><div class="heat">' + cells + '</div><p class="note">色が濃いほど作業した日。金の枠は目標をやりきった日。</p>';
+  // 分野ごとの時間
+  const [a, z] = spanRange(state.span, today), mb = minutesBy(es, a, z), max = Math.max(1, ...Object.values(mb));
+  document.querySelectorAll("#span-seg [data-span]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.span === state.span)));
+  const ids = Array.from(new Set(d.fields.map(f => f.id).concat(Object.keys(mb))));
+  document.getElementById("by-field").innerHTML = ids.filter(id => mb[id] || d.fields.some(f => f.id === id)).map(id => { const f = fieldById(id), m = mb[id] || 0;
+    return '<div class="fbar"><span>' + esc(f.name) + '</span><span class="bar"><i style="width:' + Math.round(m / max * 100) + "%;background:" + esc(f.color) + '"></i></span><span class="v">' + fmtMin(m) + "</span></div>"; }).join("");
+  let bars = "", labs = ""; const dm = []; for (let k = 13; k >= 0; k--) dm.push([addDays(today, -k), perDay[addDays(today, -k)] || 0]);
+  const dmax = Math.max(60, ...dm.map(x => x[1]));
+  dm.forEach(([day, m]) => { bars += '<span class="' + (day === today ? "today" : "") + '" style="height:' + Math.round(m / dmax * 100) + '%" title="' + day + " " + fmtMin(m) + '"></span>'; labs += "<span>" + (+day.slice(8)) + "</span>"; });
+  document.getElementById("days").innerHTML = bars; document.getElementById("dlab").innerHTML = labs;
+  // 分野の領土と段位
+  const allM = minutesBy(es);
+  document.getElementById("terr").innerHTML = d.fields.map(f => { const m = allM[f.id] || 0, t = territory(m), dn = danOf(m);
+    return '<div style="--fc:' + esc(f.color) + '"><div class="terr-head"><b>' + esc(f.name) + '</b><span class="dan">' + esc(dn.name) + '</span></div><div class="note" style="margin:.1rem 0">' + (t.regions ? t.regions + "州と" : "") + t.inRegion + "マス・" + fmtMin(m) + "</div>" +
+      '<div class="terr">' + Array.from({ length: REGION }, (_, k) => '<span class="' + (k < t.inRegion ? "on" : "") + '"></span>').join("") + "</div></div>"; }).join("");
+  // 部隊と勲章
+  const rs = d.reorg || [];
+  document.getElementById("medals").innerHTML = '<p class="note" style="margin-top:0">今の部隊:' + esc(unitName(rs.length)) + " " + esc(rk.name) + (rk.stars ? "★" + rk.stars : "") + "</p>" +
+    (rs.length ? rs.map(x => '<span class="medal">🎖 ' + esc(x.unit) + "・" + esc(x.rank) + "(" + esc(x.date) + ")</span>").join("") : '<p class="note">元帥に着いたら「再編成」で新しい部隊を作れます。前の部隊は勲章としてここに残ります。元帥の先は、戦果' + STAR_STEP + "ごとに星が増えていきます。</p>");
+}
+function renderSet(){
+  const d = state.data;
+  const set = (id, v) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = v; };
+  set("s-work", d.work); set("s-ex", d.ex); set("s-rest", d.rest); set("s-long", d.long); set("s-every", d.every); set("s-goal", d.goal); set("s-debt", d.debt); set("s-auto", d.auto ? "1" : "0");
+  set("s-exlist", d.exercises.join("\n"));
+  document.getElementById("f-list").innerHTML = d.fields.map(f => '<div class="fitem" data-fid="' + esc(f.id) + '"><input type="color" value="' + esc(f.color) + '" data-fcolor><input type="text" value="' + esc(f.name) + '" data-fname><button type="button" class="linkbtn del" data-fdel>消す</button></div>').join("");
+  document.getElementById("b-field").innerHTML = '<option value="">すべての分野</option>' + d.fields.map(f => '<option value="' + esc(f.id) + '">' + esc(f.name) + "</option>").join("");
+  document.getElementById("b-list").innerHTML = (d.bgm || []).map(b => '<li><span class="bt">' + esc(b.title || b.id) + '</span><span class="tag">' + (b.role === "rest" ? "休憩" : "作業") + '</span><span class="tag">' + esc(b.field ? fieldById(b.field).name : "すべて") + '</span><button type="button" class="linkbtn del" data-bdel="' + esc(b.id) + '">外す</button></li>').join("") || '<li class="note">まだありません</li>';
+}
+function renderAll(){ renderRank(); renderFields(); renderTimer(); renderHp(); renderBgmNow(); renderToday(); renderWar(); renderSet(); }
+let toastT = null;
+function toast(t){ const el = document.getElementById("toast"); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 3200); }
+function showPromo(rk){
+  beep("promo");
+  const el = document.getElementById("promo");
+  el.innerHTML = '<div class="pc">' + insignia(rk).replace('class="insig"', 'class="insig"') + '<div class="note">' + esc(unitName(rk.unit)) + "</div><h3>" + esc(rk.name) + (rk.stars ? " ★" + rk.stars : "") + "に昇進</h3>" +
+    '<p class="note">' + (rk.top && !rk.stars ? "最高の階級です。ここから先は星が増えていきます。「再編成」で新しい部隊を作ることもできます。" : "次は " + esc(rk.next) + "。") + '</p><button type="button" class="btn" data-promo-ok>続ける</button></div>';
+  el.hidden = false;
+}
+
+/* ───────── 操作 ───────── */
+function bind(){
+  document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".view").forEach(v => v.hidden = v.id !== "view-" + b.dataset.view);
+    document.querySelectorAll("nav.tabs button").forEach(x => x.setAttribute("aria-selected", String(x === b)));
+    if (b.dataset.view === "war") renderWar(); window.scrollTo(0, 0);
+  }));
+  document.body.addEventListener("click", e => {
+    const q = s => e.target.closest(s); let b;
+    if (q("[data-start]")) return startWork();
+    if (q("[data-pause]")) return pause();
+    if (q("[data-resume]")) return resume();
+    if (q("[data-skip]")) return skip();
+    if (q("[data-stop]")) { if (!state.run || state.run.phase === "idle" || confirm("やめますか。作業の途中なら、そこまでの時間を記録します。")) stopAll(); return; }
+    if (q("[data-ex-done]")) return exDone(true);
+    if (q("[data-ex-skip]")) return exDone(false);
+    if (q("[data-reorg]")) return reorganize();
+    if (q("[data-promo-ok]")) { document.getElementById("promo").hidden = true; return; }
+    if ((b = q("[data-field]"))) { state.field = b.dataset.field; lsSet("pomodoro-field", state.field); renderFields(); renderTimer(); renderBgmNow(); return; }
+    if ((b = q("[data-bgm-play]"))) { const it = (state.data.bgm || []).find(x => x.id === b.dataset.bgmPlay); if (it) playItem(it); return; }
+    if ((b = q("[data-span]"))) { state.span = b.dataset.span; renderWar(); return; }
+    if ((b = q("[data-fdel]"))) { const id = b.closest("[data-fid]").dataset.fid; if (!confirm("この分野を消しますか(記録は残ります)。")) return; state.data.fields = state.data.fields.filter(f => f.id !== id); saveData(); renderAll(); return; }
+    if ((b = q("[data-bdel]"))) { state.data.bgm = (state.data.bgm || []).filter(x => x.id !== b.dataset.bdel); saveData(); renderAll(); return; }
+  });
+  document.body.addEventListener("change", e => {
+    const fi = e.target.closest("[data-fid]");
+    if (fi) { const f = state.data.fields.find(x => x.id === fi.dataset.fid); if (!f) return;
+      if (e.target.matches("[data-fname]")) f.name = e.target.value.trim() || f.name; if (e.target.matches("[data-fcolor]")) f.color = e.target.value;
+      saveData(); renderFields(); renderWar(); return; }
+    if (e.target.id === "note-in" && state.lastWorkId) {
+      const ent = works(entries()).find(x => x.id === state.lastWorkId); if (!ent) return;
+      ent.note = e.target.value.trim();
+      state.pending = state.pending.filter(x => x.id !== ent.id).concat([ent]); saveLocal();
+      notePatch(ent); renderToday();
+    }
+  });
+  document.getElementById("bgm-toggle").addEventListener("click", () => {
+    if (bgmPlaying) bgmPause(); else { const r = state.run; if (ytWant && yt && state.ytReady) { try { yt.playVideo(); } catch (e) {} } else bgmFor(r && r.phase && r.phase !== "idle" ? r.phase : "work"); }
+  });
+  document.getElementById("bgm-next").addEventListener("click", bgmNext);
+  document.getElementById("bgm-vol").addEventListener("input", e => { try { if (yt && state.ytReady) yt.setVolume(+e.target.value); } catch (err) {} lsSet("pomodoro-vol", +e.target.value); });
+  document.getElementById("f-add").addEventListener("click", () => {
+    const colors = ["#27415E", "#B3283C", "#2F7A4A", "#7A5AA0", "#B07D2A", "#2C8C99", "#A0485F", "#5A5FA8"];
+    state.data.fields.push({ id: "f" + uid(), name: "新しい分野", color: colors[state.data.fields.length % colors.length] }); saveData(); renderAll();
+  });
+  document.getElementById("b-add").addEventListener("click", () => {
+    const url = document.getElementById("b-url").value, p = parseYT(url);
+    if (!p) { toast("YouTubeの動画か再生リストのURLを入れてください"); return; }
+    const item = { id: p.kind === "list" ? p.id : p.id, kind: p.kind, title: document.getElementById("b-title").value.trim(), role: document.getElementById("b-role").value, field: document.getElementById("b-field").value, url: url.trim() };
+    state.data.bgm = (state.data.bgm || []).filter(x => !(x.id === item.id && x.role === item.role && x.field === item.field)).concat([item]);
+    document.getElementById("b-url").value = ""; document.getElementById("b-title").value = "";
+    saveData(); renderAll(); toast("BGMを足しました");
+  });
+  document.getElementById("save-set").addEventListener("click", async () => {
+    const n = (id, lo, hi, fb) => { const v = Math.round(+document.getElementById(id).value); return isFinite(v) && v >= lo && v <= hi ? v : fb; }, d = state.data;
+    d.work = n("s-work", 1, 180, d.work); d.ex = n("s-ex", 0, 60, d.ex); d.rest = n("s-rest", 0, 60, d.rest); d.long = n("s-long", 0, 120, d.long);
+    d.every = n("s-every", 2, 12, d.every); d.goal = n("s-goal", 1, 30, d.goal); d.debt = n("s-debt", 10, 300, d.debt); d.auto = document.getElementById("s-auto").value === "1";
+    const ex = document.getElementById("s-exlist").value.split("\n").map(x => x.trim()).filter(Boolean); if (ex.length) d.exercises = ex;
+    setStatus("保存しています…"); const ok = await saveData(); setStatus(ok ? "保存しました" : "保存できませんでした", !ok); renderAll();
+  });
+  document.getElementById("connect").addEventListener("click", async () => {
+    const c = { owner: document.getElementById("c-owner").value.trim(), repo: document.getElementById("c-repo").value.trim() || "notion-daily",
+      branch: document.getElementById("c-branch").value.trim() || "main", token: document.getElementById("c-token").value.trim() };
+    if (!c.owner || !c.token) { const st = document.getElementById("conn-status"); st.classList.add("err"); st.textContent = "ユーザー名とトークンを入れてください。"; return; }
+    state.conn = c; lsSet(KEY_CONN, c); await loadAll();
+  });
+}
+// 作業のメモは、あとから書き足せる(同じ記録を書き換える)
+async function notePatch(ent){
+  if (!state.conn) return;
+  const m = ent.date.slice(0, 7);
+  for (let i = 0; i < 3; i++) {
+    try { const r = await readJson(LOGDIR + "/" + m + ".json"), doc = r.data || { version: 1, entries: [] };
+      const x = doc.entries.find(y => y.id === ent.id); if (x) x.note = ent.note; else doc.entries.push(ent);
+      await writeJson(LOGDIR + "/" + m + ".json", doc, r.sha); state.pending = state.pending.filter(y => y.id !== ent.id); saveLocal(); return;
+    } catch (err) { if (!(err.status === 409 || err.status === 422)) return; }
+  }
+}
+
+function boot(){
+  if ("serviceWorker" in navigator && !window.__pomoTest) navigator.serviceWorker.register("./sw.js").catch(() => {});
+  const local = lsGet(KEY_LOCAL, null);
+  if (local) { state.data = Object.assign(clone(DEFAULTS), local.data || {}); state.logs = local.logs || {}; state.pending = local.pending || []; }
+  state.run = lsGet(KEY_RUN, null);
+  const c = lsGet(KEY_CONN, null);
+  document.getElementById("c-owner").value = c ? c.owner : ""; document.getElementById("c-repo").value = c ? c.repo : "notion-daily";
+  document.getElementById("c-branch").value = c ? c.branch : "main"; document.getElementById("c-token").value = c ? c.token : "";
+  document.getElementById("app-version").textContent = APP_VERSION; document.getElementById("ver").textContent = APP_VERSION;
+  const vol = lsGet("pomodoro-vol", null); if (vol != null) document.getElementById("bgm-vol").value = vol;
+  bind(); renderAll();
+  if (c && c.token) { state.conn = c; loadAll(); }
+  if ((state.data.bgm || []).length && !window.__pomoTest) loadYT();
+  setInterval(() => { tickTimer(); if (document.getElementById("view-camp").hidden === false) renderHp(); }, 500);
+  window.addEventListener("online", flush);
+}
+window.__pomodoro = { state, rankOf, danOf, territory, streakOf, hpNow, debtOf, parseYT, multOf, minutesBy, totalGain, entries, startWork, finishWork, exDone, skip, phaseEnd, reorganize, RANKS, unitName };
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
+})();
+</script>
+</body>
+</html>
