@@ -241,6 +241,10 @@ nav.tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 3px 0 
       <p class="note">今開いている版:<b id="app-version"></b></p></div>
     <div class="card"><h2>効果音<small>行軍表・省・思案と共通</small></h2><p class="note" id="se-anchor">合図の音や、操作したときの音を鳴らします。</p></div>
     <div class="row"><button type="button" class="btn" id="save-set">設定を保存する</button><span class="status" id="set-status"></span></div>
+    <div class="card" style="margin-top:1rem"><h2>別のアプリを使っているとき<small>この端末だけの設定</small></h2>
+      <label class="note" style="display:flex;gap:.5rem;align-items:flex-start"><input type="checkbox" id="bg-on"> <span><b>別のアプリ(Ankiなど)を使っていても、終わりの音を鳴らす</b><br>作業・運動・休憩のあいだ、無音の音声を流しておき、時間ぴったりに音を鳴らします。音量は、スマホの「メディア」の音量です。</span></label>
+      <div class="row" style="margin-top:.4rem"><button type="button" class="btn ghost" id="bg-notify">知らせ(通知)も出す</button><button type="button" class="btn ghost" id="bg-test">試しに10秒で鳴らす</button><span class="status" id="bg-status"></span></div>
+      <p class="note">YouTubeのBGMとは同時に流せません(こちらを入にすると、BGMより終わりの音を優先します)。Ankiの音声などが途中で割り込んでも、終わったあとに流し直し、終わる時刻に合わせ直します。</p></div>
   </section>
 
 </div>
@@ -372,7 +376,7 @@ const SE = (() => {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "2026-10-12 r3";
+const APP_VERSION = "2026-10-15 r5";
 const DATA = "roadmap/apps/pomodoro/data.json", LOGDIR = "roadmap/apps/pomodoro/log";
 const KEY_CONN = "pomodoro-conn", KEY_LOCAL = "pomodoro-local", KEY_RUN = "pomodoro-run";
 const TANREN = "https://nisenonamae.github.io/tanren/";
@@ -570,7 +574,70 @@ function beep(kind){
       o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0 + .4); });
   } catch (e) {}
 }
-function notify(title, body){ try { if ("Notification" in window && Notification.permission === "granted" && document.hidden) new Notification(title, { body, icon: "./icon-192.png" }); } catch (e) {} }
+function notify(title, body){
+  try {
+    if (!("Notification" in window) || Notification.permission !== "granted" || !document.hidden) return;
+    const opt = { body, icon: "./icon-192.png", tag: "pomodoro", renotify: true, vibrate: [300, 150, 300] };
+    if (navigator.serviceWorker && navigator.serviceWorker.ready) navigator.serviceWorker.ready.then(reg => reg.showNotification(title, opt)).catch(() => { try { new Notification(title, opt); } catch (e) {} });
+    else new Notification(title, opt);
+  } catch (e) {}
+}
+
+/* ───────── 別のアプリを使っていても、終わりの音を鳴らす ─────────
+   スマホは裏にいるページの動きを止めるが、音声の再生は続ける。そこで、作業・運動・休憩が始まるたびに、
+   その長さぶんの無音の音声を作り、最後に終わりの音を入れて流す。時間ぴったりに、音声そのものが鳴る */
+const BG_KEY = "pomodoro-bgalarm";
+const bgOn = () => { try { return localStorage.getItem(BG_KEY) === "1"; } catch (e) { return false; } };
+let bgAudio = null, bgUrl = null, bgArm = null, bgOurs = false, bgRetry = null;
+// 音声の中で、終わりの音が始まる位置(秒)。作った長さから決まる
+const BELL_LEAD = 3;
+function alarmWav(sec){
+  const SR = 4000, bellSec = 3, total = Math.max(1, Math.ceil(sec)) + 0.4, n = Math.round(total * SR), data = new Uint8Array(n).fill(128);
+  // 終わりの音:三つの鐘(ド・ミ・ソのように上がる)。最後の bellSec 秒に入れる
+  const start = Math.max(0, n - bellSec * SR);
+  [[0, 880], [0.8, 1108.7], [1.6, 1318.5]].forEach(([t0, f]) => { const s0 = start + Math.round(t0 * SR);
+    for (let i = 0; i < Math.round(1.3 * SR) && s0 + i < n; i++) { const t = i / SR, v = Math.sin(2 * Math.PI * f * t) * Math.exp(-t * 3.2) * 110; data[s0 + i] = Math.max(0, Math.min(255, Math.round(data[s0 + i] + v))); } });
+  const head = new ArrayBuffer(44), v = new DataView(head), w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 36 + n, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, SR, true); v.setUint32(28, SR, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, "data"); v.setUint32(40, n, true);
+  return new Blob([head, data], { type: "audio/wav" });
+}
+// 割り込み(Ankiの音声など)で止められたり、ずれたりしても、終わる時刻に合わせ直す
+function bgExpected(){ if (!bgArm) return null; const total = bgArm.total, left = (bgArm.endsAt - Date.now()) / 1000; return Math.max(0, Math.min(total - 0.05, total - 0.4 - left)); }
+function bgResync(){
+  if (!bgAudio || !bgArm || bgAudio.paused) return;
+  const want = bgExpected(); if (want == null) return;
+  const left = (bgArm.endsAt - Date.now()) / 1000;
+  // 割り込みのあいだに終わりの時刻を過ぎていたら、すぐ鐘を鳴らす(一度だけ)
+  if (left <= 0) { if (!bgArm.rang) { bgArm.rang = true; try { bgAudio.currentTime = Math.max(0, bgArm.total - 0.4 - BELL_LEAD); } catch (e) {} } return; }
+  if (Math.abs((bgAudio.currentTime || 0) - want) > 1.2) { try { bgAudio.currentTime = want; } catch (e) {} }
+}
+function bgKick(){
+  // 自分で止めたのではないのに止まっていたら、流し直しを試みる(割り込みの音が終われば流れる)
+  if (!bgAudio || !bgArm || bgOurs || !bgAudio.paused) return;
+  if ((bgArm.endsAt - Date.now()) / 1000 < -10) return;            // 終わりから十分たっていたら、もう鳴らさない
+  try { const p = bgAudio.play(); if (p && p.then) p.then(bgResync).catch(() => {}); } catch (e) {}
+}
+function bgListen(a){
+  if (a.__bgListen) return; a.__bgListen = true;
+  a.addEventListener("pause", () => { if (bgOurs || !bgArm) return; clearInterval(bgRetry); bgRetry = setInterval(bgKick, 2000); });
+  a.addEventListener("playing", () => { clearInterval(bgRetry); bgRetry = null; bgResync(); });
+  a.addEventListener("timeupdate", bgResync);
+  if ("mediaSession" in navigator) { try { navigator.mediaSession.setActionHandler("play", () => { bgOurs = false; bgKick(); }); } catch (e) {} }
+}
+function alarmArm(sec, label){
+  if (!bgOn() || !(sec > 0)) return;
+  try {
+    alarmDisarm();
+    bgAudio = bgAudio || new Audio(); bgAudio.loop = false; bgAudio.volume = 1; bgListen(bgAudio);
+    bgUrl = URL.createObjectURL(alarmWav(sec)); bgAudio.src = bgUrl;
+    bgArm = { total: Math.max(1, Math.ceil(sec)) + 0.4, endsAt: Date.now() + sec * 1000, rang: false }; bgOurs = false;
+    const p = bgAudio.play(); if (p && p.catch) p.catch(() => {});
+    if ("mediaSession" in navigator && window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: (label || "ポモドーロ") + "(終わると鳴ります)", artist: "ポモドーロ" });
+  } catch (e) {}
+}
+function alarmDisarm(){ bgOurs = true; bgArm = null; clearInterval(bgRetry); bgRetry = null;
+  try { if (bgAudio) { bgAudio.pause(); bgAudio.removeAttribute("src"); bgAudio.load(); } if (bgUrl) { URL.revokeObjectURL(bgUrl); bgUrl = null; } } catch (e) {} }
 
 /* ───────── タイマー ─────────
    run = { phase: "work"|"ex"|"rest"|"long", endsAt, left(止めているとき), dur, cycle, field, startedAt, exName, exDone, note } */
@@ -583,7 +650,7 @@ function startPhase(phase, cycle){
   const msgs = (d.katsuMsgs || []).filter(Boolean);
   state.run = { phase, cycle, dur, endsAt: Date.now() + dur * 1000, left: null, field: state.field, startedAt: Date.now(), exName: ex, exDone: false,
     katsuMsg: phase === "katsu" ? (msgs[Math.floor(Math.random() * msgs.length)] || "喝!") : null };
-  saveRun(); lastTick = null; SE.play({ work: "issue", ex: "swell", rest: "save", long: "levelup", katsu: "katsu" }[phase] || "save");
+  saveRun(); lastTick = null; alarmArm(dur, PH[phase]); SE.play({ work: "issue", ex: "swell", rest: "save", long: "levelup", katsu: "katsu" }[phase] || "save");
   bgmFor(phase); renderAll();
 }
 function startWork(){
@@ -594,8 +661,8 @@ function startWork(){
   startPhase("work", cyc);
 }
 function remaining(){ const r = state.run; if (!r) return 0; return r.left != null ? r.left : (r.endsAt - Date.now()) / 1000; }
-function pause(){ const r = state.run; if (!r || r.left != null) return; r.left = remaining(); saveRun(); bgmPause(); renderAll(); }
-function resume(){ const r = state.run; if (!r || r.left == null) return; r.endsAt = Date.now() + r.left * 1000; r.left = null; saveRun(); bgmFor(r.phase); renderAll(); }
+function pause(){ const r = state.run; if (!r || r.left != null) return; r.left = remaining(); saveRun(); bgmPause(); alarmDisarm(); renderAll(); }
+function resume(){ const r = state.run; if (!r || r.left == null) return; r.endsAt = Date.now() + r.left * 1000; alarmArm(r.left, PH[r.phase]); r.left = null; saveRun(); bgmFor(r.phase); renderAll(); }
 // 作業を終える(途中でも、そこまでの時間を記録する)
 function finishWork(full){
   const r = state.run, now = Date.now(), min = Math.max(0, Math.round(((full ? r.dur : r.dur - remaining()) / 60) * 10) / 10);
@@ -648,6 +715,7 @@ function phaseEnd(){
 }
 function skip(){
   const r = state.run; if (!r || !r.phase || r.phase === "idle") return;
+  alarmDisarm();
   SE.play("down");
   if (r.phase === "work") finishWork(false);
   else if (r.phase === "ex" && !r.exDone) exDone(false);
@@ -657,13 +725,13 @@ function skip(){
 function abort(){
   const r = state.run; if (!r || !r.phase || r.phase === "idle") return;
   const was = PH[r.phase];
-  state.run = { phase: "idle", cycle: r.cycle || 0 }; saveRun(); bgmPause(); SE.play("remove"); renderAll();
+  state.run = { phase: "idle", cycle: r.cycle || 0 }; saveRun(); bgmPause(); alarmDisarm(); SE.play("remove"); renderAll();
   toast(was + "を廃止しました(記録しません)");
 }
 function stopAll(){
   const r = state.run;
   if (r && r.phase === "work" && remaining() < r.dur - 30) finishWork(false);
-  state.run = null; saveRun(); bgmPause(); renderAll();
+  state.run = null; saveRun(); bgmPause(); alarmDisarm(); renderAll();
 }
 function reorganize(){
   const rk = rankOf(totalGain(entries()), state.data.reorg);
@@ -1028,6 +1096,21 @@ async function notePatch(ent){
   }
 }
 
+function bindBg(){
+  const on = document.getElementById("bg-on"), st = document.getElementById("bg-status");
+  if (!on) return;
+  on.checked = bgOn();
+  on.addEventListener("change", () => { try { localStorage.setItem(BG_KEY, on.checked ? "1" : "0"); } catch (e) {}
+    const r = state.run; if (on.checked && r && r.phase && r.phase !== "idle" && r.left == null) alarmArm(remaining(), PH[r.phase]); if (!on.checked) alarmDisarm();
+    st.textContent = on.checked ? "入にしました" : "切にしました"; });
+  document.getElementById("bg-notify").addEventListener("click", async () => {
+    if (!("Notification" in window)) { st.textContent = "この端末では知らせを出せません"; return; }
+    const p = await Notification.requestPermission(); st.textContent = p === "granted" ? "知らせを出せるようになりました" : "知らせが許可されませんでした(スマホの設定から許可できます)"; });
+  document.getElementById("bg-test").addEventListener("click", () => {
+    const was = bgOn(); try { localStorage.setItem(BG_KEY, "1"); } catch (e) {}
+    alarmArm(10, "試し"); try { localStorage.setItem(BG_KEY, was ? "1" : "0"); } catch (e) {}
+    st.textContent = "10秒後に鳴ります。今のうちに別のアプリに切り替えて確かめてください"; });
+}
 function boot(){
   if ("serviceWorker" in navigator && !window.__pomoTest) navigator.serviceWorker.register("./sw.js").catch(() => {});
   const local = lsGet(KEY_LOCAL, null);
@@ -1044,13 +1127,14 @@ function boot(){
     ["[data-field], [data-bgm-play]", "pluck"], ["nav.tabs button, [data-span], [data-stock-tab]", "tab"]]);
   SE.mount(document.getElementById("se-anchor"));
   if (c && c.token) { state.conn = c; loadAll(); }
-  if ((state.data.bgm || []).length && !window.__pomoTest) loadYT();
+  bindBg();
+  if ((state.data.bgm || []).length && !window.__pomoTest && !bgOn()) loadYT();
   let wasRunning = false;
   setInterval(() => { tickTimer(); if (document.getElementById("view-camp").hidden === false) { renderHp(); tickBudgets(); }
     const nowRunning = !!(state.run && state.run.phase === "work"); if (nowRunning !== wasRunning) { wasRunning = nowRunning; renderBudgets(); } }, 500);
   window.addEventListener("online", flush);
 }
-window.__pomodoro = { budgetOf, renderBudgets, abort, addStock, bgmListFor, state, rankOf, danOf, territory, streakOf, hpNow, debtOf, parseYT, multOf, minutesBy, totalGain, entries, startWork, finishWork, exDone, skip, phaseEnd, reorganize, RANKS, unitName };
+window.__pomodoro = { bgArmNow: () => bgArm, budgetOf, renderBudgets, abort, addStock, bgmListFor, state, rankOf, danOf, territory, streakOf, hpNow, debtOf, parseYT, multOf, minutesBy, totalGain, entries, startWork, finishWork, exDone, skip, phaseEnd, reorganize, RANKS, unitName };
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
 })();
 </script>
